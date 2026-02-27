@@ -43,7 +43,7 @@ const CostCenter = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
                 >
-                  <Link to={`/app/obra/${job.id}`}>
+                  <Link to={`/app/centro-de-custo/obra/${job.id}`}>
                     <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-bold text-foreground truncate">{job.clientName}</h3>
