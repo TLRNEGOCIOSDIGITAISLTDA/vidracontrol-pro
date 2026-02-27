@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronRight } from "lucide-react";
+import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronRight, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { getJobs, getQuotes } from "@/lib/storage";
@@ -168,6 +168,20 @@ const AppDashboard = () => {
             </div>
           )}
         </div>
+
+        {/* Centro de Custo */}
+        <Link to="/app/centro-de-custo">
+          <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow flex items-center gap-3">
+            <div className="bg-secondary/10 rounded-lg p-2">
+              <Wallet className="h-5 w-5 text-secondary" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-foreground text-sm">Centro de Custo</h3>
+              <p className="text-xs text-muted-foreground">Controle gastos e lucros das suas obras fechadas</p>
+            </div>
+            <ChevronRight className="h-5 w-5 text-muted-foreground" />
+          </div>
+        </Link>
 
         {/* Job list */}
         <div className="flex items-center justify-between">
