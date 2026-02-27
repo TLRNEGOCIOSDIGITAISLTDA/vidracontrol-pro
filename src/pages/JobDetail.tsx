@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Plus, Trash2, Camera, PieChart, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,9 @@ import { motion } from "framer-motion";
 const JobDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isCostCenter = location.pathname.includes("/centro-de-custo/");
+  const backTo = isCostCenter ? "/app/centro-de-custo" : "/app";
   const [job, setJob] = useState<Job | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [expDesc, setExpDesc] = useState("");
@@ -32,7 +35,7 @@ const JobDetail = () => {
   if (!job) {
     return (
       <div className="min-h-screen bg-background">
-        <AppHeader title="Obra não encontrada" backTo="/app" />
+        <AppHeader title="Obra não encontrada" backTo={backTo} />
         <div className="container py-16 text-center text-muted-foreground">Obra não encontrada.</div>
       </div>
     );
@@ -81,7 +84,7 @@ const JobDetail = () => {
   const handleDelete = () => {
     if (confirm("Tem certeza que deseja excluir esta obra?")) {
       deleteJob(job.id);
-      navigate("/app");
+      navigate(backTo);
       toast.success("Obra excluída.");
     }
   };
@@ -96,7 +99,7 @@ const JobDetail = () => {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      <AppHeader title={job.clientName} backTo="/app" />
+      <AppHeader title={job.clientName} backTo={backTo} />
 
       <div className="container py-6 space-y-6 max-w-lg">
         {/* Summary */}
