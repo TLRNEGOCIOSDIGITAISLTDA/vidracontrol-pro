@@ -1,17 +1,25 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText } from "lucide-react";
+import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
-import { getJobs } from "@/lib/storage";
-import { Job } from "@/lib/types";
+import { getJobs, getQuotes } from "@/lib/storage";
+import { Job, Quote } from "@/lib/types";
 import { motion } from "framer-motion";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+
+const COLORS = {
+  orcado: "hsl(35, 95%, 55%)",
+  fechado: "hsl(145, 60%, 42%)",
+};
 
 const AppDashboard = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
 
   useEffect(() => {
     setJobs(getJobs());
+    setQuotes(getQuotes());
   }, []);
 
   const totalSales = jobs.reduce((s, j) => s + j.saleValue, 0);
@@ -20,6 +28,24 @@ const AppDashboard = () => {
 
   const fmt = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  // Quote stats
+  const orcados = quotes.filter((q) => (q.status || "orcado") === "orcado");
+  const fechados = quotes.filter((q) => q.status === "fechado");
+
+  const qtyData = [
+    { name: "Orçados", value: orcados.length, color: COLORS.orcado },
+    { name: "Fechados", value: fechados.length, color: COLORS.fechado },
+  ];
+  const valueData = [
+    { name: "Orçados", value: orcados.reduce((s, q) => s + q.total, 0), color: COLORS.orcado },
+    { name: "Fechados", value: fechados.reduce((s, q) => s + q.total, 0), color: COLORS.fechado },
+  ];
+
+  const hasQuotes = quotes.length > 0;
+
+  const renderLabel = ({ percent }: { percent: number }) =>
+    percent > 0 ? `${(percent * 100).toFixed(0)}%` : "";
 
   return (
     <div className="min-h-screen bg-background">
@@ -47,6 +73,102 @@ const AppDashboard = () => {
           </div>
         </div>
 
+        {/* Orçamentos section with charts */}
+        <div className="bg-card rounded-xl shadow-card overflow-hidden">
+          <Link to="/app/orcamentos">
+            <div className="flex items-center justify-between px-4 pt-4 pb-2 hover:bg-muted/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="bg-primary/10 rounded-lg p-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-foreground text-sm">Orçamentos</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {quotes.length} orçamento{quotes.length !== 1 ? "s" : ""} · Toque para ver todos
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </div>
+          </Link>
+
+          {hasQuotes && (
+            <div className="grid grid-cols-2 gap-4 px-4 pb-4 pt-2">
+              {/* Quantity chart */}
+              <div>
+                <h4 className="text-[10px] font-bold text-muted-foreground text-center mb-1 uppercase tracking-wide">
+                  Quantidade
+                </h4>
+                <div className="h-32">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={qtyData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={45}
+                        dataKey="value"
+                        label={renderLabel}
+                        labelLine={false}
+                        stroke="none"
+                      >
+                        {qtyData.map((entry, i) => (
+                          <Cell key={i} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v: number) => `${v} orçamento(s)`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex justify-center gap-3 mt-1">
+                  {qtyData.map((d) => (
+                    <div key={d.name} className="flex items-center gap-1 text-[10px]">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
+                      <span className="text-muted-foreground">{d.name} ({d.value})</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Value chart */}
+              <div>
+                <h4 className="text-[10px] font-bold text-muted-foreground text-center mb-1 uppercase tracking-wide">
+                  Valores (R$)
+                </h4>
+                <div className="h-32">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={valueData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={45}
+                        dataKey="value"
+                        label={renderLabel}
+                        labelLine={false}
+                        stroke="none"
+                      >
+                        {valueData.map((entry, i) => (
+                          <Cell key={i} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v: number) => fmt(v)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex justify-center gap-3 mt-1">
+                  {valueData.map((d) => (
+                    <div key={d.name} className="flex items-center gap-1 text-[10px]">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
+                      <span className="text-muted-foreground">{d.name} ({fmt(d.value)})</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Job list */}
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-foreground">Minhas Obras</h2>
@@ -56,19 +178,6 @@ const AppDashboard = () => {
             </Button>
           </Link>
         </div>
-
-        {/* Quotes shortcut */}
-        <Link to="/app/orcamentos">
-          <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow flex items-center gap-3">
-            <div className="bg-primary/10 rounded-lg p-2">
-              <FileText className="h-5 w-5 text-primary" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-foreground text-sm">Orçamentos</h3>
-              <p className="text-xs text-muted-foreground">Crie e envie orçamentos para seus clientes</p>
-            </div>
-          </div>
-        </Link>
 
         {jobs.length === 0 ? (
           <div className="text-center py-16">
