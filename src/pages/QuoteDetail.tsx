@@ -1,12 +1,11 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
-import { Share2, Trash2, Building2, User, FileText } from "lucide-react";
+import { Share2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { getQuote, deleteQuote } from "@/lib/storage";
 import { Quote } from "@/lib/types";
 import { toast } from "sonner";
-import { motion } from "framer-motion";
 
 const QuoteDetail = () => {
   const { id } = useParams();
@@ -56,10 +55,10 @@ const QuoteDetail = () => {
   const co = quote.companyInfo;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-muted">
       <AppHeader title="Orçamento" backTo="/app/orcamentos" />
 
-      <div className="container py-6 max-w-lg space-y-4">
+      <div className="container py-6 max-w-2xl space-y-4">
         {/* Actions */}
         <div className="flex gap-2">
           <Button variant="outline" className="flex-1" onClick={handleShare}>
@@ -70,94 +69,129 @@ const QuoteDetail = () => {
           </Button>
         </div>
 
-        {/* Quote preview */}
-        <div ref={printRef} className="bg-card rounded-xl shadow-elevated p-6 space-y-5">
-          {/* Company header */}
+        {/* ===== DOCUMENT STYLE ===== */}
+        <div ref={printRef} className="bg-white text-[hsl(215,25%,15%)] rounded-sm shadow-elevated" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+          
+          {/* Company Header */}
           {co.name && (
-            <div className="text-center border-b border-border pb-4">
-              <div className="flex items-center justify-center gap-2 mb-1">
-                <Building2 className="h-5 w-5 text-primary" />
-                <h2 className="font-bold text-lg text-foreground">{co.name}</h2>
-              </div>
-              {co.cnpjCpf && <p className="text-xs text-muted-foreground">{co.cnpjCpf}</p>}
-              {co.phone && <p className="text-xs text-muted-foreground">{co.phone}</p>}
-              {co.email && <p className="text-xs text-muted-foreground">{co.email}</p>}
-              {co.address && <p className="text-xs text-muted-foreground">{co.address}</p>}
+            <div className="bg-[hsl(215,25%,15%)] text-white px-6 py-5 text-center">
+              <h1 className="text-2xl font-extrabold tracking-widest uppercase">{co.name}</h1>
             </div>
           )}
 
-          {/* Title */}
-          <div className="text-center">
-            <h3 className="text-sm font-bold text-primary uppercase tracking-wider">Orçamento</h3>
-            <p className="text-xs text-muted-foreground">Data: {date}</p>
-          </div>
-
-          {/* Client */}
-          <div className="flex items-center gap-2">
-            <User className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Cliente</p>
-              <p className="font-bold text-foreground">{quote.clientName}</p>
-            </div>
-          </div>
-
-          {quote.jobType && (
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Tipo da Obra</p>
-                <p className="font-medium text-foreground">{quote.jobType}</p>
+          <div className="px-6 py-2">
+            {/* Company sub-info */}
+            {(co.address || co.cnpjCpf || co.phone) && (
+              <div className="text-center text-xs text-[hsl(215,10%,45%)] border-b border-[hsl(214,20%,88%)] pb-3 mb-4">
+                {co.address && <p>{co.address}</p>}
+                <p>
+                  {co.cnpjCpf && <span>CNPJ/CPF: {co.cnpjCpf}</span>}
+                  {co.cnpjCpf && co.phone && <span> &nbsp;|&nbsp; </span>}
+                  {co.phone && <span>Fone: {co.phone}</span>}
+                </p>
+                {co.email && <p>{co.email}</p>}
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Items table */}
-          <div className="border border-border rounded-lg overflow-hidden">
-            <div className="grid grid-cols-12 bg-muted text-xs font-bold text-muted-foreground p-2">
-              <span className="col-span-5">Item</span>
-              <span className="col-span-2 text-center">Qtd</span>
-              <span className="col-span-2 text-right">Unit.</span>
-              <span className="col-span-3 text-right">Total</span>
+            {/* Client info block */}
+            <div className="border border-[hsl(214,20%,88%)] rounded-sm mb-4">
+              <table className="w-full text-sm">
+                <tbody>
+                  <tr className="border-b border-[hsl(214,20%,88%)]">
+                    <td className="px-3 py-2 font-bold text-[hsl(215,10%,45%)] w-24">Cliente:</td>
+                    <td className="px-3 py-2 font-bold">{quote.clientName}</td>
+                    <td className="px-3 py-2 font-bold text-[hsl(215,10%,45%)] w-20 text-right">Data:</td>
+                    <td className="px-3 py-2 text-right w-28">{date}</td>
+                  </tr>
+                  {quote.jobType && (
+                    <tr>
+                      <td className="px-3 py-2 font-bold text-[hsl(215,10%,45%)]">Tipo:</td>
+                      <td className="px-3 py-2" colSpan={3}>{quote.jobType}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-            {quote.items.map((item, i) => (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: i * 0.03 }}
-                className="border-t border-border p-2 space-y-1"
-              >
-                <div className="grid grid-cols-12 text-sm items-center">
-                  <span className="col-span-5 text-foreground truncate">{item.description}</span>
-                  <span className="col-span-2 text-center text-muted-foreground">{item.quantity}</span>
-                  <span className="col-span-2 text-right text-muted-foreground">{fmt(item.unitPrice)}</span>
-                  <span className="col-span-3 text-right font-bold text-foreground">{fmt(item.total)}</span>
+
+            {/* Title */}
+            <div className="text-center mb-4">
+              <h2 className="text-xl font-extrabold tracking-wide uppercase">ORÇAMENTO</h2>
+            </div>
+
+            {/* Items Table */}
+            <div className="border border-[hsl(214,20%,88%)] rounded-sm mb-4 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[hsl(210,15%,93%)] text-[hsl(215,10%,45%)] font-bold text-xs uppercase">
+                    <th className="text-left px-3 py-2 w-10">#</th>
+                    <th className="text-left px-3 py-2">Descrição</th>
+                    <th className="text-center px-3 py-2 w-16">Qtd.</th>
+                    <th className="text-right px-3 py-2 w-24">Unit.</th>
+                    <th className="text-right px-3 py-2 w-28">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {quote.items.map((item, i) => (
+                    <tr key={item.id} className="border-t border-[hsl(214,20%,88%)]">
+                      <td className="px-3 py-2 text-[hsl(215,10%,45%)] font-bold">{i + 1}</td>
+                      <td className="px-3 py-2">
+                        <div className="font-bold">{item.description}</div>
+                        {(item.width || item.height) && (
+                          <div className="text-xs text-[hsl(215,10%,45%)]">
+                            {item.width ? `${item.width}m` : '—'} × {item.height ? `${item.height}m` : '—'}
+                            {item.width && item.height && (
+                              <span className="ml-1">({(item.width * item.height).toFixed(2)}m²)</span>
+                            )}
+                          </div>
+                        )}
+                        {item.location && (
+                          <div className="text-xs text-[hsl(215,80%,45%)]">📍 {item.location}</div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-center">{item.quantity}</td>
+                      <td className="px-3 py-2 text-right text-[hsl(215,10%,45%)]">{fmt(item.unitPrice)}</td>
+                      <td className="px-3 py-2 text-right font-bold">{fmt(item.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Total */}
+            <div className="border border-[hsl(214,20%,88%)] rounded-sm mb-6 overflow-hidden">
+              <table className="w-full text-sm">
+                <tbody>
+                  <tr className="bg-[hsl(215,25%,15%)] text-white">
+                    <td className="px-3 py-3 font-extrabold uppercase tracking-wide">VALOR TOTAL:</td>
+                    <td className="px-3 py-3 text-right font-extrabold text-lg">{fmt(quote.total)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Notes / Conditions */}
+            <div className="mb-8 text-sm text-[hsl(215,10%,45%)] space-y-1">
+              <p className="font-bold">- PROPOSTA VÁLIDA POR DEZ DIAS ÚTEIS;</p>
+              <p className="font-bold">- CONDIÇÕES DE PAGAMENTO A COMBINAR;</p>
+              {quote.notes && (
+                <div className="mt-3 whitespace-pre-wrap text-[hsl(215,25%,15%)]">
+                  <span className="font-bold">Obs: </span>{quote.notes}
                 </div>
-                {item.location && (
-                  <p className="text-xs text-primary/80 pl-1">📍 {item.location}</p>
-                )}
-                {(item.width || item.height) && (
-                  <p className="text-xs text-muted-foreground pl-1">
-                    Medidas: {item.width ? `${item.width}m` : '—'} × {item.height ? `${item.height}m` : '—'}
-                  </p>
-                )}
-              </motion.div>
-            ))}
-          </div>
-
-          {/* Total */}
-          <div className="bg-primary/10 rounded-lg p-4 text-center">
-            <span className="text-sm text-muted-foreground">Valor Total</span>
-            <div className="text-2xl font-bold text-primary">{fmt(quote.total)}</div>
-          </div>
-
-          {/* Notes */}
-          {quote.notes && (
-            <div className="border-t border-border pt-3">
-              <p className="text-xs font-bold text-muted-foreground mb-1">Observações:</p>
-              <p className="text-sm text-foreground whitespace-pre-wrap">{quote.notes}</p>
+              )}
             </div>
-          )}
+
+            {/* Signatures */}
+            <div className="flex justify-between px-4 pb-8 pt-8">
+              <div className="text-center">
+                <div className="border-t border-[hsl(215,25%,15%)] w-48 mx-auto mb-1" />
+                <span className="text-sm font-bold text-[hsl(215,10%,45%)]">Cliente</span>
+              </div>
+              <div className="text-center">
+                <div className="border-t border-[hsl(215,25%,15%)] w-48 mx-auto mb-1" />
+                <span className="text-sm font-bold text-[hsl(215,10%,45%)]">Consultor(a) de vendas</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
