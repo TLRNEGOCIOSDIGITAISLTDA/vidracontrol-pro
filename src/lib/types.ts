@@ -71,6 +71,7 @@ export interface QuoteItem {
   id: string;
   type: QuoteItemType;
   description: string;
+  location?: string;
   width?: number;
   height?: number;
   quantity: number;
