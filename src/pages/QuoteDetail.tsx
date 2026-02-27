@@ -133,6 +133,9 @@ const QuoteDetail = () => {
                   <span className="col-span-2 text-right text-muted-foreground">{fmt(item.unitPrice)}</span>
                   <span className="col-span-3 text-right font-bold text-foreground">{fmt(item.total)}</span>
                 </div>
+                {item.location && (
+                  <p className="text-xs text-primary/80 pl-1">📍 {item.location}</p>
+                )}
                 {(item.width || item.height) && (
                   <p className="text-xs text-muted-foreground pl-1">
                     Medidas: {item.width ? `${item.width}m` : '—'} × {item.height ? `${item.height}m` : '—'}
@@ -173,8 +176,9 @@ function buildShareText(q: Quote): string {
   lines.push(`Data: ${new Date(q.createdAt).toLocaleDateString("pt-BR")}`);
   lines.push("");
   q.items.forEach(item => {
+    const local = item.location ? ` — 📍 ${item.location}` : '';
     const medidas = (item.width || item.height) ? ` (${item.width || '—'}m × ${item.height || '—'}m)` : '';
-    lines.push(`▸ ${item.description}${medidas} — ${item.quantity}x ${fmt(item.unitPrice)} = ${fmt(item.total)}`);
+    lines.push(`▸ ${item.description}${local}${medidas} — ${item.quantity}x ${fmt(item.unitPrice)} = ${fmt(item.total)}`);
   });
   lines.push("");
   lines.push(`💰 *Total: ${fmt(q.total)}*`);

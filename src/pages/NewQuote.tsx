@@ -197,6 +197,16 @@ const NewQuote = () => {
                     />
                   )}
 
+                  <div>
+                    <Label className="text-xs">Local / Ambiente</Label>
+                    <Input
+                      className="mt-1"
+                      value={item.location || ""}
+                      onChange={e => updateItem(item.id, { location: e.target.value })}
+                      placeholder="Ex: Porta da cozinha, Janela da lavanderia..."
+                    />
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs">Largura (m)</Label>
