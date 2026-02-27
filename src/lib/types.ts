@@ -43,3 +43,55 @@ export interface Job {
   createdAt: string;
   expenses: Expense[];
 }
+
+export type QuoteItemType =
+  | 'vidro_comum'
+  | 'vidro_temperado'
+  | 'vidro_laminado'
+  | 'esquadria_aluminio'
+  | 'cobertura'
+  | 'box'
+  | 'espelho'
+  | 'espelho_led'
+  | 'personalizado';
+
+export const QUOTE_ITEM_LABELS: Record<QuoteItemType, string> = {
+  vidro_comum: 'Vidro Comum',
+  vidro_temperado: 'Vidro Temperado',
+  vidro_laminado: 'Vidro Laminado',
+  esquadria_aluminio: 'Esquadria de Alumínio',
+  cobertura: 'Cobertura',
+  box: 'Box',
+  espelho: 'Espelho',
+  espelho_led: 'Espelho com LED',
+  personalizado: 'Personalizado',
+};
+
+export interface QuoteItem {
+  id: string;
+  type: QuoteItemType;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface CompanyInfo {
+  name: string;
+  cnpjCpf: string;
+  phone: string;
+  email: string;
+  address: string;
+  logoUrl?: string;
+}
+
+export interface Quote {
+  id: string;
+  clientName: string;
+  jobType: string;
+  items: QuoteItem[];
+  total: number;
+  companyInfo: CompanyInfo;
+  createdAt: string;
+  notes?: string;
+}

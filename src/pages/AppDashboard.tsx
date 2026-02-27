@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { getJobs } from "@/lib/storage";
@@ -56,6 +56,19 @@ const AppDashboard = () => {
             </Button>
           </Link>
         </div>
+
+        {/* Quotes shortcut */}
+        <Link to="/app/orcamentos">
+          <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow flex items-center gap-3">
+            <div className="bg-primary/10 rounded-lg p-2">
+              <FileText className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-foreground text-sm">Orçamentos</h3>
+              <p className="text-xs text-muted-foreground">Crie e envie orçamentos para seus clientes</p>
+            </div>
+          </div>
+        </Link>
 
         {jobs.length === 0 ? (
           <div className="text-center py-16">

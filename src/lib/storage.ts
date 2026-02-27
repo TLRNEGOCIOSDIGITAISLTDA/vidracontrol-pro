@@ -1,4 +1,4 @@
-import { Job, Expense } from './types';
+import { Job, Expense, Quote, CompanyInfo } from './types';
 
 const STORAGE_KEY = 'vidraceiro-jobs';
 
@@ -63,4 +63,49 @@ export function deleteExpense(jobId: string, expenseId: string) {
 
 export function getJob(id: string): Job | undefined {
   return getJobs().find(j => j.id === id);
+}
+
+// ---- Company Info ----
+const COMPANY_KEY = 'vidraceiro-company';
+
+export function getCompanyInfo(): CompanyInfo {
+  const data = localStorage.getItem(COMPANY_KEY);
+  return data ? JSON.parse(data) : { name: '', cnpjCpf: '', phone: '', email: '', address: '' };
+}
+
+export function saveCompanyInfo(info: CompanyInfo) {
+  localStorage.setItem(COMPANY_KEY, JSON.stringify(info));
+}
+
+// ---- Quotes ----
+const QUOTES_KEY = 'vidraceiro-quotes';
+
+export function getQuotes(): Quote[] {
+  const data = localStorage.getItem(QUOTES_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+export function saveQuotes(quotes: Quote[]) {
+  localStorage.setItem(QUOTES_KEY, JSON.stringify(quotes));
+}
+
+export function addQuote(quote: Omit<Quote, 'id' | 'createdAt'>): Quote {
+  const quotes = getQuotes();
+  const newQuote: Quote = {
+    ...quote,
+    id: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+  };
+  quotes.unshift(newQuote);
+  saveQuotes(quotes);
+  return newQuote;
+}
+
+export function getQuote(id: string): Quote | undefined {
+  return getQuotes().find(q => q.id === id);
+}
+
+export function deleteQuote(id: string) {
+  const quotes = getQuotes().filter(q => q.id !== id);
+  saveQuotes(quotes);
 }

@@ -1,0 +1,261 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Plus, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import AppHeader from "@/components/app/AppHeader";
+import { addQuote, getCompanyInfo, saveCompanyInfo } from "@/lib/storage";
+import { QuoteItem, QuoteItemType, QUOTE_ITEM_LABELS, CompanyInfo } from "@/lib/types";
+import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
+
+const JOB_TYPES = [
+  "Residencial",
+  "Comercial",
+  "Industrial",
+  "Reforma",
+  "Obra Nova",
+  "Outro",
+];
+
+const NewQuote = () => {
+  const navigate = useNavigate();
+  const [company, setCompany] = useState<CompanyInfo>(getCompanyInfo());
+  const [clientName, setClientName] = useState("");
+  const [jobType, setJobType] = useState("");
+  const [notes, setNotes] = useState("");
+  const [items, setItems] = useState<QuoteItem[]>([]);
+  const [showCompany, setShowCompany] = useState(false);
+
+  const addItem = () => {
+    setItems([
+      ...items,
+      {
+        id: crypto.randomUUID(),
+        type: "vidro_comum",
+        description: QUOTE_ITEM_LABELS["vidro_comum"],
+        quantity: 1,
+        unitPrice: 0,
+        total: 0,
+      },
+    ]);
+  };
+
+  const updateItem = (id: string, field: Partial<QuoteItem>) => {
+    setItems(prev =>
+      prev.map(item => {
+        if (item.id !== id) return item;
+        const updated = { ...item, ...field };
+        if (field.type && field.type !== "personalizado") {
+          updated.description = QUOTE_ITEM_LABELS[field.type];
+        }
+        updated.total = updated.quantity * updated.unitPrice;
+        return updated;
+      })
+    );
+  };
+
+  const removeItem = (id: string) => {
+    setItems(prev => prev.filter(i => i.id !== id));
+  };
+
+  const total = items.reduce((s, i) => s + i.total, 0);
+
+  const fmt = (v: number) =>
+    v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientName.trim()) {
+      toast.error("Preencha o nome do cliente.");
+      return;
+    }
+    if (items.length === 0) {
+      toast.error("Adicione pelo menos um item.");
+      return;
+    }
+    saveCompanyInfo(company);
+    const quote = addQuote({
+      clientName: clientName.trim(),
+      jobType,
+      items,
+      total,
+      companyInfo: company,
+      notes: notes.trim() || undefined,
+    });
+    toast.success("Orçamento criado!");
+    navigate(`/app/orcamento/${quote.id}`);
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <AppHeader title="Novo Orçamento" backTo="/app/orcamentos" />
+      <div className="container py-6 max-w-lg">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Company toggle */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowCompany(!showCompany)}
+              className="text-sm font-medium text-primary underline"
+            >
+              {showCompany ? "Ocultar dados da empresa" : "Dados da empresa (cabeçalho)"}
+            </button>
+            {showCompany && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                className="mt-3 space-y-3 bg-card rounded-xl p-4 shadow-card"
+              >
+                <div>
+                  <Label>Nome da Empresa</Label>
+                  <Input className="mt-1" value={company.name} onChange={e => setCompany({ ...company, name: e.target.value })} placeholder="Vidraçaria Silva" />
+                </div>
+                <div>
+                  <Label>CNPJ / CPF</Label>
+                  <Input className="mt-1" value={company.cnpjCpf} onChange={e => setCompany({ ...company, cnpjCpf: e.target.value })} placeholder="00.000.000/0001-00" />
+                </div>
+                <div>
+                  <Label>Telefone</Label>
+                  <Input className="mt-1" value={company.phone} onChange={e => setCompany({ ...company, phone: e.target.value })} placeholder="(11) 99999-9999" />
+                </div>
+                <div>
+                  <Label>E-mail</Label>
+                  <Input className="mt-1" value={company.email} onChange={e => setCompany({ ...company, email: e.target.value })} placeholder="contato@vidracaria.com" />
+                </div>
+                <div>
+                  <Label>Endereço</Label>
+                  <Input className="mt-1" value={company.address} onChange={e => setCompany({ ...company, address: e.target.value })} placeholder="Rua..." />
+                </div>
+              </motion.div>
+            )}
+          </div>
+
+          {/* Client & job type */}
+          <div>
+            <Label>Nome do Cliente</Label>
+            <Input className="mt-1" value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Ex: Maria da Silva" />
+          </div>
+          <div>
+            <Label>Tipo da Obra</Label>
+            <Select value={jobType} onValueChange={setJobType}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Selecione..." />
+              </SelectTrigger>
+              <SelectContent>
+                {JOB_TYPES.map(t => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Items */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <Label className="text-base font-bold">Itens do Orçamento</Label>
+              <Button type="button" size="sm" variant="outline" onClick={addItem}>
+                <Plus className="h-4 w-4 mr-1" /> Item
+              </Button>
+            </div>
+
+            <AnimatePresence>
+              {items.map((item, idx) => (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  className="bg-card rounded-xl p-4 shadow-card mb-3 space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-foreground">Item {idx + 1}</span>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(item.id)} className="text-destructive h-8 w-8">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <Select value={item.type} onValueChange={(v: QuoteItemType) => updateItem(item.id, { type: v })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(QUOTE_ITEM_LABELS).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {item.type === "personalizado" && (
+                    <Input
+                      placeholder="Descreva o item..."
+                      value={item.description}
+                      onChange={e => updateItem(item.id, { description: e.target.value })}
+                    />
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Quantidade</Label>
+                      <Input
+                        className="mt-1"
+                        type="number"
+                        min={1}
+                        value={item.quantity}
+                        onChange={e => updateItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
+                        inputMode="numeric"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Valor Unitário (R$)</Label>
+                      <Input
+                        className="mt-1"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={item.unitPrice || ""}
+                        onChange={e => updateItem(item.id, { unitPrice: parseFloat(e.target.value) || 0 })}
+                        inputMode="decimal"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="text-right text-sm font-bold text-primary">
+                    Subtotal: {fmt(item.total)}
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            {items.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Clique em "+ Item" para adicionar produtos ao orçamento.
+              </p>
+            )}
+          </div>
+
+          {/* Total */}
+          {items.length > 0 && (
+            <div className="bg-primary/10 rounded-xl p-4 text-center">
+              <span className="text-sm text-muted-foreground">Total do Orçamento</span>
+              <div className="text-2xl font-bold text-primary">{fmt(total)}</div>
+            </div>
+          )}
+
+          {/* Notes */}
+          <div>
+            <Label>Observações (opcional)</Label>
+            <Textarea className="mt-1" rows={3} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Condições de pagamento, prazo de entrega..." />
+          </div>
+
+          <Button type="submit" className="w-full" size="lg">Criar Orçamento</Button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default NewQuote;
