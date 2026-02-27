@@ -1,9 +1,9 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
-import { Share2, Trash2 } from "lucide-react";
+import { Share2, Trash2, CheckCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
-import { getQuote, deleteQuote } from "@/lib/storage";
+import { getQuote, deleteQuote, getQuotes, saveQuotes } from "@/lib/storage";
 import { Quote } from "@/lib/types";
 import { toast } from "sonner";
 
@@ -36,6 +36,19 @@ const QuoteDetail = () => {
     }
   };
 
+  const handleToggleStatus = () => {
+    if (!quote || !id) return;
+    const newStatus = (quote.status || "orcado") === "orcado" ? "fechado" : "orcado";
+    const quotes = getQuotes();
+    const idx = quotes.findIndex((q) => q.id === id);
+    if (idx !== -1) {
+      quotes[idx] = { ...quotes[idx], status: newStatus };
+      saveQuotes(quotes);
+      setQuote({ ...quote, status: newStatus });
+      toast.success(newStatus === "fechado" ? "Orçamento marcado como fechado!" : "Orçamento marcado como orçado.");
+    }
+  };
+
   const handleShare = async () => {
     if (!quote) return;
     const text = buildShareText(quote);
@@ -61,6 +74,17 @@ const QuoteDetail = () => {
       <div className="container py-6 max-w-2xl space-y-4">
         {/* Actions */}
         <div className="flex gap-2">
+          <Button
+            variant={(quote.status || "orcado") === "fechado" ? "default" : "outline"}
+            className="flex-1"
+            onClick={handleToggleStatus}
+          >
+            {(quote.status || "orcado") === "fechado" ? (
+              <><CheckCircle className="h-4 w-4 mr-2" /> Fechado</>
+            ) : (
+              <><Clock className="h-4 w-4 mr-2" /> Orçado</>
+            )}
+          </Button>
           <Button variant="outline" className="flex-1" onClick={handleShare}>
             <Share2 className="h-4 w-4 mr-2" /> Compartilhar
           </Button>
