@@ -88,6 +88,13 @@ export interface CompanyInfo {
   logoUrl?: string;
 }
 
+export type QuoteStatus = 'orcado' | 'fechado';
+
+export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
+  orcado: 'Orçado',
+  fechado: 'Fechado',
+};
+
 export interface Quote {
   id: string;
   clientName: string;
@@ -97,4 +104,5 @@ export interface Quote {
   companyInfo: CompanyInfo;
   createdAt: string;
   notes?: string;
+  status?: QuoteStatus;
 }
