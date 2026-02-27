@@ -125,12 +125,19 @@ const QuoteDetail = () => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: i * 0.03 }}
-                className="grid grid-cols-12 text-sm p-2 border-t border-border items-center"
+                className="border-t border-border p-2 space-y-1"
               >
-                <span className="col-span-5 text-foreground truncate">{item.description}</span>
-                <span className="col-span-2 text-center text-muted-foreground">{item.quantity}</span>
-                <span className="col-span-2 text-right text-muted-foreground">{fmt(item.unitPrice)}</span>
-                <span className="col-span-3 text-right font-bold text-foreground">{fmt(item.total)}</span>
+                <div className="grid grid-cols-12 text-sm items-center">
+                  <span className="col-span-5 text-foreground truncate">{item.description}</span>
+                  <span className="col-span-2 text-center text-muted-foreground">{item.quantity}</span>
+                  <span className="col-span-2 text-right text-muted-foreground">{fmt(item.unitPrice)}</span>
+                  <span className="col-span-3 text-right font-bold text-foreground">{fmt(item.total)}</span>
+                </div>
+                {(item.width || item.height) && (
+                  <p className="text-xs text-muted-foreground pl-1">
+                    Medidas: {item.width ? `${item.width}m` : '—'} × {item.height ? `${item.height}m` : '—'}
+                  </p>
+                )}
               </motion.div>
             ))}
           </div>
@@ -166,7 +173,8 @@ function buildShareText(q: Quote): string {
   lines.push(`Data: ${new Date(q.createdAt).toLocaleDateString("pt-BR")}`);
   lines.push("");
   q.items.forEach(item => {
-    lines.push(`▸ ${item.description} — ${item.quantity}x ${fmt(item.unitPrice)} = ${fmt(item.total)}`);
+    const medidas = (item.width || item.height) ? ` (${item.width || '—'}m × ${item.height || '—'}m)` : '';
+    lines.push(`▸ ${item.description}${medidas} — ${item.quantity}x ${fmt(item.unitPrice)} = ${fmt(item.total)}`);
   });
   lines.push("");
   lines.push(`💰 *Total: ${fmt(q.total)}*`);

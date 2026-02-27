@@ -199,6 +199,35 @@ const NewQuote = () => {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
+                      <Label className="text-xs">Largura (m)</Label>
+                      <Input
+                        className="mt-1"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={item.width || ""}
+                        onChange={e => updateItem(item.id, { width: parseFloat(e.target.value) || undefined })}
+                        inputMode="decimal"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Altura (m)</Label>
+                      <Input
+                        className="mt-1"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={item.height || ""}
+                        onChange={e => updateItem(item.id, { height: parseFloat(e.target.value) || undefined })}
+                        inputMode="decimal"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
                       <Label className="text-xs">Quantidade</Label>
                       <Input
                         className="mt-1"
