@@ -170,18 +170,14 @@ const AppDashboard = () => {
         </div>
 
         {/* Centro de Custo */}
-        <Link to="/app/centro-de-custo">
-          <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow flex items-center gap-3">
-            <div className="bg-secondary/10 rounded-lg p-2">
-              <Wallet className="h-5 w-5 text-secondary" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-foreground text-sm">Centro de Custo</h3>
-              <p className="text-xs text-muted-foreground">Controle gastos e lucros das suas obras fechadas</p>
-            </div>
-            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-          </div>
-        </Link>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-foreground">Centro de Custo</h2>
+          <Link to="/app/centro-de-custo">
+            <Button size="sm">
+              <Wallet className="h-4 w-4 mr-1" /> Ver Obras
+            </Button>
+          </Link>
+        </div>
 
         {/* Job list */}
         <div className="flex items-center justify-between">
