@@ -34,6 +34,18 @@ export const CATEGORY_COLORS: Record<ExpenseCategory, string> = {
   outros: 'hsl(0, 0%, 50%)',
 };
 
+export interface JobItem {
+  id: string;
+  type: QuoteItemType;
+  description: string;
+  width?: number;
+  height?: number;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  area?: number;
+}
+
 export interface Job {
   id: string;
   clientName: string;
@@ -42,6 +54,7 @@ export interface Job {
   status: 'em_andamento' | 'concluido';
   createdAt: string;
   expenses: Expense[];
+  items?: JobItem[];
 }
 
 export type QuoteItemType =
