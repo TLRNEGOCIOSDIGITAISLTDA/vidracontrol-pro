@@ -26,17 +26,20 @@ const JobDetail = () => {
   const [expPhoto, setExpPhoto] = useState<string | undefined>();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const reload = () => {
-    if (id) setJob(getJob(id) || null);
+  const reload = async () => {
+    if (id) {
+      const j = await getJob(id);
+      setJob(j || null);
+    }
   };
 
-  useEffect(reload, [id]);
+  useEffect(() => { reload(); }, [id]);
 
   if (!job) {
     return (
       <div className="min-h-screen bg-background">
-        <AppHeader title="Obra não encontrada" backTo={backTo} />
-        <div className="container py-16 text-center text-muted-foreground">Obra não encontrada.</div>
+        <AppHeader title="Obra" backTo={backTo} />
+        <div className="container py-16 text-center text-muted-foreground">Carregando...</div>
       </div>
     );
   }
@@ -47,13 +50,12 @@ const JobDetail = () => {
 
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-  // Group expenses by category
   const byCategory = job.expenses.reduce<Record<string, number>>((acc, e) => {
     acc[e.category] = (acc[e.category] || 0) + e.value;
     return acc;
   }, {});
 
-  const handleAddExpense = () => {
+  const handleAddExpense = async () => {
     if (!expDesc.trim() || !expValue.trim()) {
       toast.error("Preencha a descrição e o valor.");
       return;
@@ -63,27 +65,27 @@ const JobDetail = () => {
       toast.error("Valor inválido.");
       return;
     }
-    addExpense(job.id, { description: expDesc.trim(), value: val, category: expCategory, photoUrl: expPhoto });
+    await addExpense(job.id, { description: expDesc.trim(), value: val, category: expCategory, photoUrl: expPhoto });
     setExpDesc(""); setExpValue(""); setExpCategory("material"); setExpPhoto(undefined);
     setDialogOpen(false);
-    reload();
+    await reload();
     toast.success("Gasto adicionado!");
   };
 
-  const handleDeleteExpense = (expenseId: string) => {
-    deleteExpense(job.id, expenseId);
-    reload();
+  const handleDeleteExpense = async (expenseId: string) => {
+    await deleteExpense(job.id, expenseId);
+    await reload();
     toast.success("Gasto removido.");
   };
 
-  const handleComplete = () => {
-    updateJob(job.id, { status: job.status === 'concluido' ? 'em_andamento' : 'concluido' });
-    reload();
+  const handleComplete = async () => {
+    await updateJob(job.id, { status: job.status === 'concluido' ? 'em_andamento' : 'concluido' });
+    await reload();
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (confirm("Tem certeza que deseja excluir esta obra?")) {
-      deleteJob(job.id);
+      await deleteJob(job.id);
       navigate(backTo);
       toast.success("Obra excluída.");
     }

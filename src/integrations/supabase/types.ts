@@ -14,7 +14,278 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      company_info: {
+        Row: {
+          address: string
+          cnpj_cpf: string
+          created_at: string
+          email: string
+          id: string
+          logo_url: string | null
+          name: string
+          phone: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string
+          cnpj_cpf?: string
+          created_at?: string
+          email?: string
+          id?: string
+          logo_url?: string | null
+          name?: string
+          phone?: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          cnpj_cpf?: string
+          created_at?: string
+          email?: string
+          id?: string
+          logo_url?: string | null
+          name?: string
+          phone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      job_expenses: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          id: string
+          job_id: string
+          photo_url: string | null
+          value: number
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description: string
+          id?: string
+          job_id: string
+          photo_url?: string | null
+          value?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          job_id?: string
+          photo_url?: string | null
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_expenses_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_items: {
+        Row: {
+          area: number | null
+          created_at: string
+          description: string
+          height: number | null
+          id: string
+          job_id: string
+          quantity: number
+          total: number
+          type: string
+          unit_price: number
+          width: number | null
+        }
+        Insert: {
+          area?: number | null
+          created_at?: string
+          description?: string
+          height?: number | null
+          id?: string
+          job_id: string
+          quantity?: number
+          total?: number
+          type?: string
+          unit_price?: number
+          width?: number | null
+        }
+        Update: {
+          area?: number | null
+          created_at?: string
+          description?: string
+          height?: number | null
+          id?: string
+          job_id?: string
+          quantity?: number
+          total?: number
+          type?: string
+          unit_price?: number
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_items_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jobs: {
+        Row: {
+          client_name: string
+          created_at: string
+          description: string
+          id: string
+          sale_value: number
+          status: string
+        }
+        Insert: {
+          client_name: string
+          created_at?: string
+          description?: string
+          id?: string
+          sale_value?: number
+          status?: string
+        }
+        Update: {
+          client_name?: string
+          created_at?: string
+          description?: string
+          id?: string
+          sale_value?: number
+          status?: string
+        }
+        Relationships: []
+      }
+      quote_costs: {
+        Row: {
+          category: string
+          created_at: string
+          date: string
+          description: string
+          id: string
+          quote_id: string
+          value: number
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          date: string
+          description: string
+          id?: string
+          quote_id: string
+          value?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          date?: string
+          description?: string
+          id?: string
+          quote_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_costs_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_items: {
+        Row: {
+          created_at: string
+          description: string
+          height: number | null
+          id: string
+          location: string | null
+          quantity: number
+          quote_id: string
+          total: number
+          type: string
+          unit_price: number
+          width: number | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          height?: number | null
+          id?: string
+          location?: string | null
+          quantity?: number
+          quote_id: string
+          total?: number
+          type?: string
+          unit_price?: number
+          width?: number | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          height?: number | null
+          id?: string
+          location?: string | null
+          quantity?: number
+          quote_id?: string
+          total?: number
+          type?: string
+          unit_price?: number
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotes: {
+        Row: {
+          client_name: string
+          company_info: Json
+          created_at: string
+          id: string
+          job_type: string | null
+          notes: string | null
+          status: string
+          total: number
+        }
+        Insert: {
+          client_name: string
+          company_info?: Json
+          created_at?: string
+          id?: string
+          job_type?: string | null
+          notes?: string | null
+          status?: string
+          total?: number
+        }
+        Update: {
+          client_name?: string
+          company_info?: Json
+          created_at?: string
+          id?: string
+          job_type?: string | null
+          notes?: string | null
+          status?: string
+          total?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
