@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Wallet, ChevronRight } from "lucide-react";
+import { Wallet, ChevronRight, Plus } from "lucide-react";
 import AppHeader from "@/components/app/AppHeader";
 import { getJobs } from "@/lib/storage";
 import { Job } from "@/lib/types";
@@ -66,6 +66,14 @@ const CostCenter = () => {
                           </div>
                         </div>
                       </div>
+                      <Link
+                        to={`/app/centro-de-custo/obra/${job.id}`}
+                        className="mt-3 flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-primary/10 text-primary font-semibold text-sm hover:bg-primary/20 transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Gerenciar Gastos
+                      </Link>
                     </div>
                   </Link>
                 </motion.div>
