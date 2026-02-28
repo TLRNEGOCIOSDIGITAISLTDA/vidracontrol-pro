@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronRight, Wallet } from "lucide-react";
+import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronDown, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { getJobs, getQuotes } from "@/lib/storage";
@@ -43,6 +43,7 @@ const AppDashboard = () => {
   ];
 
   const hasQuotes = quotes.length > 0;
+  const [quotesOpen, setQuotesOpen] = useState(false);
 
   const renderLabel = ({ percent }: { percent: number }) =>
     percent > 0 ? `${(percent * 100).toFixed(0)}%` : "";
@@ -155,52 +156,72 @@ const AppDashboard = () => {
           </div>
         )}
 
-        {/* Seção Orçamentos — lista */}
+        {/* Seção Orçamentos — collapsed/expandable */}
         <div>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-foreground">Orçamentos</h2>
-            <Link to="/app/orcamentos">
-              <Button size="sm">
-                <FileText className="h-4 w-4 mr-1" /> Ver Orçamentos
+            <div className="flex items-center gap-2">
+              <Link to="/app/novo-orcamento">
+                <Button size="sm">
+                  <Plus className="h-4 w-4 mr-1" /> Novo Orçamento
+                </Button>
+              </Link>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setQuotesOpen(!quotesOpen)}
+                className="gap-1"
+              >
+                Ver todos
+                <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${quotesOpen ? "rotate-180" : ""}`} />
               </Button>
-            </Link>
+            </div>
           </div>
-          {quotes.length === 0 ? (
-            <div className="text-center py-10">
-              <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
-              <p className="text-muted-foreground">Nenhum orçamento ainda.</p>
-              <p className="text-muted-foreground text-sm">Crie um orçamento para começar!</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {quotes.map((quote, i) => (
-                <motion.div
-                  key={quote.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                >
-                  <Link to={`/app/orcamento/${quote.id}`}>
-                    <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-bold text-foreground truncate">{quote.clientName}</h3>
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                          (quote.status || "orcado") === "fechado"
-                            ? "bg-success/10 text-success"
-                            : "bg-primary/10 text-primary"
-                        }`}>
-                          {(quote.status || "orcado") === "fechado" ? "Fechado" : "Orçado"}
-                        </span>
+
+          <div
+            className="overflow-hidden transition-all duration-300 ease-out"
+            style={{
+              maxHeight: quotesOpen ? `${quotes.length * 120 + 100}px` : "0px",
+              opacity: quotesOpen ? 1 : 0,
+            }}
+          >
+            <div className="pt-3 space-y-3">
+              {quotes.length === 0 ? (
+                <div className="text-center py-10">
+                  <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
+                  <p className="text-muted-foreground">Nenhum orçamento ainda.</p>
+                  <p className="text-muted-foreground text-sm">Crie um orçamento para começar!</p>
+                </div>
+              ) : (
+                quotes.map((quote, i) => (
+                  <motion.div
+                    key={quote.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                  >
+                    <Link to={`/app/orcamento/${quote.id}`}>
+                      <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-bold text-foreground truncate">{quote.clientName}</h3>
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                            (quote.status || "orcado") === "fechado"
+                              ? "bg-success/10 text-success"
+                              : "bg-primary/10 text-primary"
+                          }`}>
+                            {(quote.status || "orcado") === "fechado" ? "Fechado" : "Orçado"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className="text-muted-foreground">Total: <strong className="text-foreground">{fmt(quote.total)}</strong></span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-4 text-sm">
-                        <span className="text-muted-foreground">Total: <strong className="text-foreground">{fmt(quote.total)}</strong></span>
-                      </div>
-                    </div>
-                  </Link>
-                </motion.div>
-              ))}
+                    </Link>
+                  </motion.div>
+                ))
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Centro de Custo */}
