@@ -44,6 +44,8 @@ const AppDashboard = () => {
 
   const hasQuotes = quotes.length > 0;
   const [quotesOpen, setQuotesOpen] = useState(false);
+  const [costsOpen, setCostsOpen] = useState(false);
+  const [jobsOpen, setJobsOpen] = useState(false);
 
   const renderLabel = ({ percent }: { percent: number }) =>
     percent > 0 ? `${(percent * 100).toFixed(0)}%` : "";
@@ -225,67 +227,143 @@ const AppDashboard = () => {
         </div>
 
         {/* Centro de Custo */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-foreground">Centro de Custo</h2>
-          <Link to="/app/centro-de-custo">
-            <Button size="sm">
-              <Wallet className="h-4 w-4 mr-1" /> Ver Obras
-            </Button>
-          </Link>
+        <div>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-foreground">Centro de Custo</h2>
+            <div className="flex items-center gap-2">
+              <Link to="/app/centro-de-custo">
+                <Button size="sm">
+                  <Wallet className="h-4 w-4 mr-1" /> Gerenciar
+                </Button>
+              </Link>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setCostsOpen(!costsOpen)}
+                className="gap-1"
+              >
+                Ver todos
+                <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${costsOpen ? "rotate-180" : ""}`} />
+              </Button>
+            </div>
+          </div>
+
+          <div
+            className="overflow-hidden transition-all duration-300 ease-out"
+            style={{
+              maxHeight: costsOpen ? `${jobs.length * 140 + 100}px` : "0px",
+              opacity: costsOpen ? 1 : 0,
+            }}
+          >
+            <div className="pt-3 space-y-3">
+              {jobs.length === 0 ? (
+                <div className="text-center py-10">
+                  <Wallet className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
+                  <p className="text-muted-foreground">Nenhuma obra no centro de custo.</p>
+                </div>
+              ) : (
+                jobs.map((job, i) => {
+                  const exp = job.expenses.reduce((s, e) => s + e.value, 0);
+                  const profit = job.saleValue - exp;
+                  return (
+                    <motion.div
+                      key={job.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                    >
+                      <Link to={`/app/centro-de-custo/obra/${job.id}`}>
+                        <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow">
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="font-bold text-foreground truncate">{job.clientName}</h3>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm">
+                            <span className="text-muted-foreground">Gastos: <strong className="text-secondary">{fmt(exp)}</strong></span>
+                            <span className="text-muted-foreground">Lucro: <strong className={profit >= 0 ? "text-success" : "text-destructive"}>{fmt(profit)}</strong></span>
+                          </div>
+                        </div>
+                      </Link>
+                    </motion.div>
+                  );
+                })
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Minhas Obras */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-foreground">Minhas Obras</h2>
-          <Link to="/app/nova-obra">
-            <Button size="sm">
-              <Plus className="h-4 w-4 mr-1" /> Nova Obra
-            </Button>
-          </Link>
-        </div>
+        <div>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-foreground">Minhas Obras</h2>
+            <div className="flex items-center gap-2">
+              <Link to="/app/nova-obra">
+                <Button size="sm">
+                  <Plus className="h-4 w-4 mr-1" /> Nova Obra
+                </Button>
+              </Link>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setJobsOpen(!jobsOpen)}
+                className="gap-1"
+              >
+                Ver todos
+                <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${jobsOpen ? "rotate-180" : ""}`} />
+              </Button>
+            </div>
+          </div>
 
-        {jobs.length === 0 ? (
-          <div className="text-center py-16">
-            <Briefcase className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
-            <p className="text-muted-foreground">Nenhuma obra ainda.</p>
-            <p className="text-muted-foreground text-sm">Clique em "Nova Obra" para começar!</p>
+          <div
+            className="overflow-hidden transition-all duration-300 ease-out"
+            style={{
+              maxHeight: jobsOpen ? `${jobs.length * 140 + 100}px` : "0px",
+              opacity: jobsOpen ? 1 : 0,
+            }}
+          >
+            <div className="pt-3 space-y-3">
+              {jobs.length === 0 ? (
+                <div className="text-center py-10">
+                  <Briefcase className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
+                  <p className="text-muted-foreground">Nenhuma obra ainda.</p>
+                  <p className="text-muted-foreground text-sm">Clique em "Nova Obra" para começar!</p>
+                </div>
+              ) : (
+                jobs.map((job, i) => {
+                  const expenses = job.expenses.reduce((s, e) => s + e.value, 0);
+                  const profit = job.saleValue - expenses;
+                  return (
+                    <motion.div
+                      key={job.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                    >
+                      <Link to={`/app/obra/${job.id}`}>
+                        <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow">
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="font-bold text-foreground truncate">{job.clientName}</h3>
+                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                              job.status === 'concluido' 
+                                ? 'bg-success/10 text-success' 
+                                : 'bg-primary/10 text-primary'
+                            }`}>
+                              {job.status === 'concluido' ? 'Concluído' : 'Em andamento'}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate mb-3">{job.description}</p>
+                          <div className="flex items-center gap-4 text-sm">
+                            <span className="text-muted-foreground">Venda: <strong className="text-foreground">{fmt(job.saleValue)}</strong></span>
+                            <span className="text-muted-foreground">Lucro: <strong className={profit >= 0 ? "text-success" : "text-destructive"}>{fmt(profit)}</strong></span>
+                          </div>
+                        </div>
+                      </Link>
+                    </motion.div>
+                  );
+                })
+              )}
+            </div>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {jobs.map((job, i) => {
-              const expenses = job.expenses.reduce((s, e) => s + e.value, 0);
-              const profit = job.saleValue - expenses;
-              return (
-                <motion.div
-                  key={job.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                >
-                  <Link to={`/app/obra/${job.id}`}>
-                    <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-bold text-foreground truncate">{job.clientName}</h3>
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                          job.status === 'concluido' 
-                            ? 'bg-success/10 text-success' 
-                            : 'bg-primary/10 text-primary'
-                        }`}>
-                          {job.status === 'concluido' ? 'Concluído' : 'Em andamento'}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground truncate mb-3">{job.description}</p>
-                      <div className="flex items-center gap-4 text-sm">
-                        <span className="text-muted-foreground">Venda: <strong className="text-foreground">{fmt(job.saleValue)}</strong></span>
-                        <span className="text-muted-foreground">Lucro: <strong className={profit >= 0 ? "text-success" : "text-destructive"}>{fmt(profit)}</strong></span>
-                      </div>
-                    </div>
-                  </Link>
-                </motion.div>
-              );
-            })}
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
