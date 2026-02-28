@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ const JOB_TYPES = [
 
 const NewQuote = () => {
   const navigate = useNavigate();
-  const [company, setCompany] = useState<CompanyInfo>(getCompanyInfo());
+  const [company, setCompany] = useState<CompanyInfo>({ name: '', cnpjCpf: '', phone: '', email: '', address: '' });
   const [clientName, setClientName] = useState("");
   const [jobType, setJobType] = useState("");
   const [notes, setNotes] = useState("");
@@ -38,6 +38,11 @@ const NewQuote = () => {
     },
   ]);
   const [showCompany, setShowCompany] = useState(false);
+
+  // Load company info async
+  useEffect(() => {
+    getCompanyInfo().then(setCompany);
+  }, []);
 
   const addItem = () => {
     setItems([
@@ -76,7 +81,7 @@ const NewQuote = () => {
   const fmt = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientName.trim()) {
       toast.error("Preencha o nome do cliente.");
@@ -86,8 +91,8 @@ const NewQuote = () => {
       toast.error("Adicione pelo menos um item.");
       return;
     }
-    saveCompanyInfo(company);
-    const quote = addQuote({
+    await saveCompanyInfo(company);
+    const quote = await addQuote({
       clientName: clientName.trim(),
       jobType,
       items,
@@ -166,9 +171,6 @@ const NewQuote = () => {
           <div>
             <div className="flex items-center justify-between mb-3">
               <Label className="text-base font-bold">Itens do Orçamento</Label>
-              <Button type="button" size="sm" variant="outline" onClick={addItem}>
-                <Plus className="h-4 w-4 mr-1" /> Item
-              </Button>
             </div>
 
             <AnimatePresence>

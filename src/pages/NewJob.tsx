@@ -74,7 +74,7 @@ const NewJob = () => {
 
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientName.trim()) {
       toast.error("Preencha o nome do cliente.");
@@ -84,14 +84,14 @@ const NewJob = () => {
       toast.error("Adicione pelo menos um item à obra.");
       return;
     }
-    addJob({
+    await addJob({
       clientName: clientName.trim(),
       description: description.trim(),
       saleValue: totalValue,
       status: "em_andamento",
       items,
     });
-    refreshJobs();
+    await refreshJobs();
     toast.success("Obra criada com sucesso!");
     navigate("/app");
   };

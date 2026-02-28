@@ -18,8 +18,7 @@ const FLOW_STEPS: { status: QuoteStatus; label: string }[] = [
 
 function getFlowIndex(status: QuoteStatus): number {
   if (status === 'perdido') return -1;
-  const idx = FLOW_STEPS.findIndex(s => s.status === status);
-  return idx;
+  return FLOW_STEPS.findIndex(s => s.status === status);
 }
 
 const QuoteDetail = () => {
@@ -31,22 +30,23 @@ const QuoteDetail = () => {
 
   useEffect(() => {
     if (!id) return;
-    const q = getQuote(id);
-    if (!q) {
-      toast.error("Orçamento não encontrado.");
-      navigate("/app/orcamentos");
-      return;
-    }
-    setQuote(q);
+    getQuote(id).then(q => {
+      if (!q) {
+        toast.error("Orçamento não encontrado.");
+        navigate("/app/orcamentos");
+        return;
+      }
+      setQuote(q);
+    });
   }, [id, navigate]);
 
   const fmt = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!id) return;
     if (confirm("Excluir este orçamento?")) {
-      deleteQuote(id);
+      await deleteQuote(id);
       toast.success("Orçamento excluído.");
       navigate("/app/orcamentos");
     }
@@ -57,27 +57,26 @@ const QuoteDetail = () => {
   const isPerdido = currentStatus === 'perdido';
   const progressValue = isPerdido ? 0 : ((flowIndex + 1) / FLOW_STEPS.length) * 100;
 
-  const handleSendWhatsApp = () => {
+  const handleSendWhatsApp = async () => {
     if (!quote || !id) return;
     const text = buildWhatsAppText(quote);
     const encoded = encodeURIComponent(text);
     window.open(`https://wa.me/?text=${encoded}`, '_blank');
-    // Auto-advance: orcado → enviado → aguardando
-    changeQuoteStatus(id, 'aguardando');
+    await changeQuoteStatus(id, 'aguardando');
     setQuote({ ...quote, status: 'aguardando' });
     toast.success('Orçamento enviado! Status alterado para "Aguardando Aprovação".');
   };
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
     if (!quote || !id) return;
-    changeQuoteStatus(id, 'fechado');
+    await changeQuoteStatus(id, 'fechado');
     toast.success("Orçamento aprovado! Obra criada automaticamente em Minhas Obras. 🎉");
     navigate("/app");
   };
 
-  const handleLost = () => {
+  const handleLost = async () => {
     if (!quote || !id) return;
-    changeQuoteStatus(id, 'perdido');
+    await changeQuoteStatus(id, 'perdido');
     setQuote({ ...quote, status: 'perdido' });
     toast("Orçamento marcado como Perdido.");
   };
@@ -128,14 +127,12 @@ const QuoteDetail = () => {
 
         {/* ===== ACTION BUTTONS BY STAGE ===== */}
         <div className="flex gap-2 flex-wrap">
-          {/* Stage: Orçado → show "Enviar para Cliente" */}
           {currentStatus === 'orcado' && (
             <Button className="flex-1 gap-2" onClick={handleSendWhatsApp}>
               <Send className="h-4 w-4" /> Enviar para Cliente (WhatsApp)
             </Button>
           )}
 
-          {/* Stage: Enviado / Aguardando → show Approve + Lost */}
           {(currentStatus === 'enviado' || currentStatus === 'aguardando') && (
             <>
               <Button className="flex-1 gap-2 bg-success hover:bg-success/90 text-white" onClick={handleApprove}>
@@ -147,14 +144,12 @@ const QuoteDetail = () => {
             </>
           )}
 
-          {/* Stage: Fechado → info only */}
           {currentStatus === 'fechado' && (
             <div className="flex-1 bg-success/10 text-success rounded-lg px-4 py-3 text-sm font-bold text-center">
               ✅ Orçamento aprovado — Obra criada em Minhas Obras
             </div>
           )}
 
-          {/* Stage: Perdido → info */}
           {isPerdido && (
             <div className="flex-1 bg-destructive/10 text-destructive rounded-lg px-4 py-3 text-sm font-bold text-center">
               ❌ Orçamento perdido
@@ -169,7 +164,6 @@ const QuoteDetail = () => {
         {/* ===== DOCUMENT STYLE ===== */}
         <div ref={printRef} className="bg-white text-[hsl(215,25%,15%)] rounded-sm shadow-elevated" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
           
-          {/* Company Header */}
           {co.name && (
             <div className="bg-[hsl(215,25%,15%)] text-white px-6 py-5 text-center">
               <h1 className="text-2xl font-extrabold tracking-widest uppercase">{co.name}</h1>
@@ -177,7 +171,6 @@ const QuoteDetail = () => {
           )}
 
           <div className="px-6 py-2">
-            {/* Company sub-info */}
             {(co.address || co.cnpjCpf || co.phone) && (
               <div className="text-center text-xs text-[hsl(215,10%,45%)] border-b border-[hsl(214,20%,88%)] pb-3 mb-4">
                 {co.address && <p>{co.address}</p>}
@@ -190,7 +183,6 @@ const QuoteDetail = () => {
               </div>
             )}
 
-            {/* Client info block */}
             <div className="border border-[hsl(214,20%,88%)] rounded-sm mb-4">
               <table className="w-full text-sm">
                 <tbody>
@@ -210,12 +202,10 @@ const QuoteDetail = () => {
               </table>
             </div>
 
-            {/* Title */}
             <div className="text-center mb-4">
               <h2 className="text-xl font-extrabold tracking-wide uppercase">ORÇAMENTO</h2>
             </div>
 
-            {/* Items Table */}
             <div className="border border-[hsl(214,20%,88%)] rounded-sm mb-4 overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
@@ -254,7 +244,6 @@ const QuoteDetail = () => {
               </table>
             </div>
 
-            {/* Total */}
             <div className="border border-[hsl(214,20%,88%)] rounded-sm mb-6 overflow-hidden">
               <table className="w-full text-sm">
                 <tbody>
@@ -266,7 +255,6 @@ const QuoteDetail = () => {
               </table>
             </div>
 
-            {/* Notes / Conditions */}
             <div className="mb-8 text-sm text-[hsl(215,10%,45%)] space-y-1">
               <p className="font-bold">- PROPOSTA VÁLIDA POR DEZ DIAS ÚTEIS;</p>
               <p className="font-bold">- CONDIÇÕES DE PAGAMENTO A COMBINAR;</p>
@@ -277,7 +265,6 @@ const QuoteDetail = () => {
               )}
             </div>
 
-            {/* Signatures */}
             <div className="flex justify-between px-4 pb-8 pt-8">
               <div className="text-center">
                 <div className="border-t border-[hsl(215,25%,15%)] w-48 mx-auto mb-1" />

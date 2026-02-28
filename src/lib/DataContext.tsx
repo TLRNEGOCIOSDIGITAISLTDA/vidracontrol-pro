@@ -1,52 +1,75 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { Job, Quote, QuoteStatus, JobItem } from "./types";
-import { getJobs, getQuotes, saveQuotes, addJob as storageAddJob, addQuoteCost as storageSaveCost, deleteQuoteCost as storageDeleteCost } from "./storage";
+import {
+  getJobs,
+  getQuotes,
+  addJob as storageAddJob,
+  addQuoteCost as storageSaveCost,
+  deleteQuoteCost as storageDeleteCost,
+  saveQuoteStatus,
+} from "./storage";
 
 interface DataContextType {
   jobs: Job[];
   quotes: Quote[];
-  refreshAll: () => void;
-  refreshQuotes: () => void;
-  refreshJobs: () => void;
-  addCost: (quoteId: string, cost: Parameters<typeof storageSaveCost>[1]) => ReturnType<typeof storageSaveCost>;
-  removeCost: (quoteId: string, costId: string) => void;
-  changeQuoteStatus: (quoteId: string, newStatus: QuoteStatus) => void;
+  loading: boolean;
+  refreshAll: () => Promise<void>;
+  refreshQuotes: () => Promise<void>;
+  refreshJobs: () => Promise<void>;
+  addCost: (quoteId: string, cost: Parameters<typeof storageSaveCost>[1]) => Promise<Awaited<ReturnType<typeof storageSaveCost>>>;
+  removeCost: (quoteId: string, costId: string) => Promise<void>;
+  changeQuoteStatus: (quoteId: string, newStatus: QuoteStatus) => Promise<void>;
   lastUpdate: number;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [jobs, setJobs] = useState<Job[]>(() => getJobs());
-  const [quotes, setQuotes] = useState<Quote[]>(() => getQuotes());
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
 
   const bump = () => setLastUpdate(Date.now());
 
-  const refreshJobs = useCallback(() => { setJobs(getJobs()); bump(); }, []);
-  const refreshQuotes = useCallback(() => { setQuotes(getQuotes()); bump(); }, []);
-  const refreshAll = useCallback(() => { refreshJobs(); refreshQuotes(); }, [refreshJobs, refreshQuotes]);
+  const refreshJobs = useCallback(async () => {
+    const data = await getJobs();
+    setJobs(data);
+    bump();
+  }, []);
 
-  const addCost = useCallback((quoteId: string, cost: Parameters<typeof storageSaveCost>[1]) => {
-    const result = storageSaveCost(quoteId, cost);
-    refreshQuotes();
+  const refreshQuotes = useCallback(async () => {
+    const data = await getQuotes();
+    setQuotes(data);
+    bump();
+  }, []);
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([refreshJobs(), refreshQuotes()]);
+    setLoading(false);
+  }, [refreshJobs, refreshQuotes]);
+
+  // Initial load
+  useEffect(() => { refreshAll(); }, [refreshAll]);
+
+  const addCost = useCallback(async (quoteId: string, cost: Parameters<typeof storageSaveCost>[1]) => {
+    const result = await storageSaveCost(quoteId, cost);
+    await refreshQuotes();
     return result;
   }, [refreshQuotes]);
 
-  const removeCost = useCallback((quoteId: string, costId: string) => {
-    storageDeleteCost(quoteId, costId);
-    refreshQuotes();
+  const removeCost = useCallback(async (quoteId: string, costId: string) => {
+    await storageDeleteCost(quoteId, costId);
+    await refreshQuotes();
   }, [refreshQuotes]);
 
-  const changeQuoteStatus = useCallback((quoteId: string, newStatus: QuoteStatus) => {
-    const allQuotes = getQuotes();
-    const idx = allQuotes.findIndex(q => q.id === quoteId);
-    if (idx === -1) return;
+  const changeQuoteStatus = useCallback(async (quoteId: string, newStatus: QuoteStatus) => {
+    // Find current quote
+    const quote = quotes.find(q => q.id === quoteId);
+    if (!quote) return;
 
-    const quote = allQuotes[idx];
     const prevStatus = quote.status || 'orcado';
-    allQuotes[idx] = { ...quote, status: newStatus };
-    saveQuotes(allQuotes);
+    await saveQuoteStatus(quoteId, newStatus);
 
     // When moving to "fechado", auto-create a Job from the quote
     if (newStatus === 'fechado' && prevStatus !== 'fechado') {
@@ -62,7 +85,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         area: item.width && item.height ? item.width * item.height * item.quantity : undefined,
       }));
 
-      storageAddJob({
+      await storageAddJob({
         clientName: quote.clientName,
         description: `Orçamento aprovado — ${quote.jobType || 'Vidraçaria'}`,
         saleValue: quote.total,
@@ -70,14 +93,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
         items: jobItems,
       });
 
-      refreshJobs();
+      await refreshJobs();
     }
 
-    refreshQuotes();
-  }, [refreshJobs, refreshQuotes]);
+    await refreshQuotes();
+  }, [quotes, refreshJobs, refreshQuotes]);
 
   return (
-    <DataContext.Provider value={{ jobs, quotes, refreshAll, refreshQuotes, refreshJobs, addCost, removeCost, changeQuoteStatus, lastUpdate }}>
+    <DataContext.Provider value={{ jobs, quotes, loading, refreshAll, refreshQuotes, refreshJobs, addCost, removeCost, changeQuoteStatus, lastUpdate }}>
       {children}
     </DataContext.Provider>
   );

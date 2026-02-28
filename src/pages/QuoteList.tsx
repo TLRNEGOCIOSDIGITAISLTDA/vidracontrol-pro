@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Plus, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
-import { getQuotes } from "@/lib/storage";
+import { useData } from "@/lib/DataContext";
 import { Quote, QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS, QUOTE_STATUS_BG } from "@/lib/types";
 import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
@@ -12,11 +12,7 @@ const ALL_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'fechado
 const ACTIVE_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'perdido'];
 
 const QuoteList = () => {
-  const [quotes, setQuotes] = useState<Quote[]>([]);
-
-  useEffect(() => {
-    setQuotes(getQuotes());
-  }, []);
+  const { quotes } = useData();
 
   const fmt = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -40,6 +36,12 @@ const QuoteList = () => {
 
   const renderLabel = ({ percent }: { percent: number }) =>
     percent > 0 ? `${(percent * 100).toFixed(0)}%` : "";
+
+  const activeByStatus = ACTIVE_STATUSES.map((status) => {
+    const filtered = quotes.filter((q) => (q.status || "orcado") === status);
+    return { status, label: QUOTE_STATUS_LABELS[status], color: QUOTE_STATUS_COLORS[status], count: filtered.length, total: filtered.reduce((s, q) => s + q.total, 0), quotes: filtered };
+  });
+  const activeQuotes = quotes.filter(q => (q.status || 'orcado') !== 'fechado');
 
   return (
     <div className="min-h-screen bg-background">
@@ -104,14 +106,8 @@ const QuoteList = () => {
           </div>
         )}
 
-        {/* Quote list grouped by status (excluding fechado) */}
-        {(() => {
-          const activeByStatus = ACTIVE_STATUSES.map((status) => {
-            const filtered = quotes.filter((q) => (q.status || "orcado") === status);
-            return { status, label: QUOTE_STATUS_LABELS[status], color: QUOTE_STATUS_COLORS[status], count: filtered.length, total: filtered.reduce((s, q) => s + q.total, 0), quotes: filtered };
-          });
-          const activeQuotes = quotes.filter(q => (q.status || 'orcado') !== 'fechado');
-          return activeQuotes.length === 0 ? (
+        {/* Quote list */}
+        {activeQuotes.length === 0 ? (
           <div className="text-center py-16">
             <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
             <p className="text-muted-foreground">Nenhum orçamento ativo.</p>
@@ -152,8 +148,7 @@ const QuoteList = () => {
               </div>
             ))}
           </div>
-        );
-        })()}
+        )}
       </div>
     </div>
   );
