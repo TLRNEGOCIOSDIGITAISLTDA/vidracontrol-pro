@@ -1,21 +1,32 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
-import { Share2, Trash2, ChevronDown } from "lucide-react";
+import { Share2, Trash2, Send, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { getQuote, deleteQuote } from "@/lib/storage";
 import { useData } from "@/lib/DataContext";
 import { Quote, QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from "@/lib/types";
 import { toast } from "sonner";
+import { Progress } from "@/components/ui/progress";
 
-const ALL_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'fechado', 'perdido'];
+const FLOW_STEPS: { status: QuoteStatus; label: string }[] = [
+  { status: 'orcado', label: 'Orçado' },
+  { status: 'enviado', label: 'Enviado' },
+  { status: 'aguardando', label: 'Aguardando' },
+  { status: 'fechado', label: 'Fechado' },
+];
+
+function getFlowIndex(status: QuoteStatus): number {
+  if (status === 'perdido') return -1;
+  const idx = FLOW_STEPS.findIndex(s => s.status === status);
+  return idx;
+}
 
 const QuoteDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { refreshQuotes, changeQuoteStatus } = useData();
+  const { changeQuoteStatus } = useData();
   const [quote, setQuote] = useState<Quote | null>(null);
-  const [statusOpen, setStatusOpen] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,30 +52,34 @@ const QuoteDetail = () => {
     }
   };
 
-  const handleChangeStatus = (newStatus: QuoteStatus) => {
+  const currentStatus = (quote?.status || 'orcado') as QuoteStatus;
+  const flowIndex = getFlowIndex(currentStatus);
+  const isPerdido = currentStatus === 'perdido';
+  const progressValue = isPerdido ? 0 : ((flowIndex + 1) / FLOW_STEPS.length) * 100;
+
+  const handleSendWhatsApp = () => {
     if (!quote || !id) return;
-    changeQuoteStatus(id, newStatus);
-    setQuote({ ...quote, status: newStatus });
-    setStatusOpen(false);
-    if (newStatus === 'fechado') {
-      toast.success("Orçamento aprovado! Obra criada automaticamente em Minhas Obras. 🎉");
-      navigate("/app");
-    } else {
-      toast.success(`Status alterado para "${QUOTE_STATUS_LABELS[newStatus]}".`);
-    }
+    const text = buildWhatsAppText(quote);
+    const encoded = encodeURIComponent(text);
+    window.open(`https://wa.me/?text=${encoded}`, '_blank');
+    // Auto-advance: orcado → enviado → aguardando
+    changeQuoteStatus(id, 'aguardando');
+    setQuote({ ...quote, status: 'aguardando' });
+    toast.success('Orçamento enviado! Status alterado para "Aguardando Aprovação".');
   };
 
-  const handleShare = async () => {
-    if (!quote) return;
-    const text = buildShareText(quote);
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: `Orçamento - ${quote.clientName}`, text });
-      } catch { /* user cancelled */ }
-    } else {
-      await navigator.clipboard.writeText(text);
-      toast.success("Orçamento copiado para a área de transferência!");
-    }
+  const handleApprove = () => {
+    if (!quote || !id) return;
+    changeQuoteStatus(id, 'fechado');
+    toast.success("Orçamento aprovado! Obra criada automaticamente em Minhas Obras. 🎉");
+    navigate("/app");
+  };
+
+  const handleLost = () => {
+    if (!quote || !id) return;
+    changeQuoteStatus(id, 'perdido');
+    setQuote({ ...quote, status: 'perdido' });
+    toast("Orçamento marcado como Perdido.");
   };
 
   if (!quote) return null;
@@ -77,38 +92,76 @@ const QuoteDetail = () => {
       <AppHeader title="Orçamento" backTo="/app/orcamentos" />
 
       <div className="container py-6 max-w-2xl space-y-4">
-        {/* Actions */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Button
-              variant="outline"
-              className="w-full gap-2"
-              onClick={() => setStatusOpen(!statusOpen)}
-              style={{ borderColor: QUOTE_STATUS_COLORS[(quote.status || 'orcado') as QuoteStatus], color: QUOTE_STATUS_COLORS[(quote.status || 'orcado') as QuoteStatus] }}
-            >
-              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: QUOTE_STATUS_COLORS[(quote.status || 'orcado') as QuoteStatus] }} />
-              {QUOTE_STATUS_LABELS[(quote.status || 'orcado') as QuoteStatus]}
-              <ChevronDown className={`h-4 w-4 transition-transform ${statusOpen ? 'rotate-180' : ''}`} />
-            </Button>
-            {statusOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-card rounded-lg shadow-elevated border border-border z-50 overflow-hidden">
-                {ALL_STATUSES.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => handleChangeStatus(s)}
-                    className={`flex items-center gap-2 w-full px-3 py-2.5 text-sm hover:bg-muted transition-colors ${(quote.status || 'orcado') === s ? 'bg-muted font-bold' : ''}`}
-                  >
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: QUOTE_STATUS_COLORS[s] }} />
-                    {QUOTE_STATUS_LABELS[s]}
-                  </button>
-                ))}
-              </div>
-            )}
+
+        {/* ===== FLOW PROGRESS BAR ===== */}
+        <div className="bg-card rounded-xl p-4 shadow-card space-y-3">
+          <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase tracking-wide">
+            <span>Fluxo do Orçamento</span>
+            {isPerdido && <span className="text-destructive">Perdido</span>}
           </div>
-          <Button variant="outline" className="flex-1" onClick={handleShare}>
-            <Share2 className="h-4 w-4 mr-2" /> Compartilhar
-          </Button>
-          <Button variant="destructive" size="icon" onClick={handleDelete}>
+          <Progress value={progressValue} className="h-2" />
+          <div className="flex justify-between">
+            {FLOW_STEPS.map((step, i) => {
+              const isActive = !isPerdido && flowIndex >= i;
+              const isCurrent = !isPerdido && flowIndex === i;
+              return (
+                <div key={step.status} className="flex flex-col items-center gap-1">
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 transition-colors ${
+                      isCurrent
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : isActive
+                          ? 'border-success bg-success text-white'
+                          : 'border-border bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {i + 1}
+                  </div>
+                  <span className={`text-[10px] ${isCurrent ? 'text-primary font-bold' : isActive ? 'text-success font-semibold' : 'text-muted-foreground'}`}>
+                    {step.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ===== ACTION BUTTONS BY STAGE ===== */}
+        <div className="flex gap-2 flex-wrap">
+          {/* Stage: Orçado → show "Enviar para Cliente" */}
+          {currentStatus === 'orcado' && (
+            <Button className="flex-1 gap-2" onClick={handleSendWhatsApp}>
+              <Send className="h-4 w-4" /> Enviar para Cliente (WhatsApp)
+            </Button>
+          )}
+
+          {/* Stage: Enviado / Aguardando → show Approve + Lost */}
+          {(currentStatus === 'enviado' || currentStatus === 'aguardando') && (
+            <>
+              <Button className="flex-1 gap-2 bg-success hover:bg-success/90 text-white" onClick={handleApprove}>
+                <CheckCircle2 className="h-4 w-4" /> Aprovar Orçamento
+              </Button>
+              <Button variant="destructive" className="flex-1 gap-2" onClick={handleLost}>
+                <XCircle className="h-4 w-4" /> Perdido
+              </Button>
+            </>
+          )}
+
+          {/* Stage: Fechado → info only */}
+          {currentStatus === 'fechado' && (
+            <div className="flex-1 bg-success/10 text-success rounded-lg px-4 py-3 text-sm font-bold text-center">
+              ✅ Orçamento aprovado — Obra criada em Minhas Obras
+            </div>
+          )}
+
+          {/* Stage: Perdido → info */}
+          {isPerdido && (
+            <div className="flex-1 bg-destructive/10 text-destructive rounded-lg px-4 py-3 text-sm font-bold text-center">
+              ❌ Orçamento perdido
+            </div>
+          )}
+
+          <Button variant="outline" size="icon" onClick={handleDelete}>
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
@@ -242,7 +295,7 @@ const QuoteDetail = () => {
   );
 };
 
-function buildShareText(q: Quote): string {
+function buildWhatsAppText(q: Quote): string {
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const lines: string[] = [];
   if (q.companyInfo.name) lines.push(`*${q.companyInfo.name}*`);
@@ -260,6 +313,8 @@ function buildShareText(q: Quote): string {
   });
   lines.push("");
   lines.push(`💰 *Total: ${fmt(q.total)}*`);
+  lines.push("");
+  lines.push("Segue o orçamento conforme solicitado. Qualquer dúvida estou à disposição!");
   if (q.notes) {
     lines.push("");
     lines.push(`Obs: ${q.notes}`);
