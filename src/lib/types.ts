@@ -146,9 +146,17 @@ export interface QuoteCost {
   createdAt: string;
 }
 
+export interface UserProfile {
+  id: string;
+  userId: string;
+  whatsapp: string;
+  fullName: string;
+}
+
 export interface Quote {
   id: string;
   clientName: string;
+  clientPhone?: string;
   jobType: string;
   items: QuoteItem[];
   total: number;

@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Job, Expense, Quote, CompanyInfo, QuoteCost, JobItem, QuoteItem } from './types';
+import { Job, Expense, Quote, CompanyInfo, QuoteCost, JobItem, QuoteItem, UserProfile } from './types';
 
 async function getUserId(): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -40,6 +40,7 @@ export async function getQuotes(): Promise<Quote[]> {
   return rows.map(r => ({
     id: r.id,
     clientName: r.client_name,
+    clientPhone: (r as any).client_phone || '',
     jobType: r.job_type || '',
     total: Number(r.total),
     companyInfo: (r.company_info as unknown as CompanyInfo) || { name: '', cnpjCpf: '', phone: '', email: '', address: '' },
@@ -78,13 +79,14 @@ export async function addQuote(quote: Omit<Quote, 'id' | 'createdAt'>): Promise<
   const uid = await getUserId();
   const { data: row, error } = await supabase.from('quotes').insert({
     client_name: quote.clientName,
+    client_phone: quote.clientPhone || '',
     job_type: quote.jobType || null,
     total: quote.total,
     notes: quote.notes || null,
     status: quote.status || 'orcado',
     company_info: quote.companyInfo as any,
     user_id: uid,
-  }).select().single();
+  } as any).select().single();
 
   if (error || !row) throw new Error(error?.message || 'Failed to create quote');
 
@@ -324,6 +326,33 @@ export async function saveCompanyInfo(info: CompanyInfo) {
       logo_url: info.logoUrl || null,
       user_id: uid,
     });
+  }
+}
+
+// ---- User Profile ----
+
+export async function getProfile(): Promise<UserProfile | null> {
+  const { data } = await supabase.from('profiles' as any).select('*').limit(1).single();
+  if (!data) return null;
+  const d = data as any;
+  return { id: d.id, userId: d.user_id, whatsapp: d.whatsapp, fullName: d.full_name };
+}
+
+export async function saveProfile(profile: { whatsapp: string; fullName: string }) {
+  const uid = await getUserId();
+  const { data: existing } = await supabase.from('profiles' as any).select('id').eq('user_id', uid).limit(1).single();
+  if (existing) {
+    await supabase.from('profiles' as any).update({
+      whatsapp: profile.whatsapp,
+      full_name: profile.fullName,
+      updated_at: new Date().toISOString(),
+    } as any).eq('id', (existing as any).id);
+  } else {
+    await supabase.from('profiles' as any).insert({
+      user_id: uid,
+      whatsapp: profile.whatsapp,
+      full_name: profile.fullName,
+    } as any);
   }
 }
 

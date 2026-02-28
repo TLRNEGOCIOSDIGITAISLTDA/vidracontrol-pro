@@ -210,6 +210,33 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string
+          id: string
+          updated_at: string
+          user_id: string
+          whatsapp: string
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+          whatsapp?: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+          whatsapp?: string
+        }
+        Relationships: []
+      }
       quote_costs: {
         Row: {
           category: string
@@ -307,6 +334,7 @@ export type Database = {
       quotes: {
         Row: {
           client_name: string
+          client_phone: string
           company_info: Json
           created_at: string
           id: string
@@ -318,6 +346,7 @@ export type Database = {
         }
         Insert: {
           client_name: string
+          client_phone?: string
           company_info?: Json
           created_at?: string
           id?: string
@@ -329,6 +358,7 @@ export type Database = {
         }
         Update: {
           client_name?: string
+          client_phone?: string
           company_info?: Json
           created_at?: string
           id?: string

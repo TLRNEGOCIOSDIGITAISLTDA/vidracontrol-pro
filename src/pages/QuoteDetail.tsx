@@ -1,13 +1,16 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
-import { Share2, Trash2, Send, CheckCircle2, XCircle } from "lucide-react";
+import { Trash2, Send, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
-import { getQuote, deleteQuote } from "@/lib/storage";
+import { getQuote, deleteQuote, getProfile } from "@/lib/storage";
 import { useData } from "@/lib/DataContext";
 import { Quote, QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from "@/lib/types";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
+import { supabase } from "@/integrations/supabase/client";
+import { generateQuotePdf } from "@/lib/generateQuotePdf";
+import { maskWhatsApp } from "@/lib/whatsappMask";
 
 const FLOW_STEPS: { status: QuoteStatus; label: string }[] = [
   { status: 'orcado', label: 'Orçado' },
@@ -26,6 +29,7 @@ const QuoteDetail = () => {
   const navigate = useNavigate();
   const { changeQuoteStatus } = useData();
   const [quote, setQuote] = useState<Quote | null>(null);
+  const [sending, setSending] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -59,12 +63,61 @@ const QuoteDetail = () => {
 
   const handleSendWhatsApp = async () => {
     if (!quote || !id) return;
-    const text = buildWhatsAppText(quote);
-    const encoded = encodeURIComponent(text);
-    window.open(`https://wa.me/?text=${encoded}`, '_blank');
-    await changeQuoteStatus(id, 'aguardando');
-    setQuote({ ...quote, status: 'aguardando' });
-    toast.success('Orçamento enviado! Status alterado para "Aguardando Aprovação".');
+    
+    const clientPhone = quote.clientPhone?.replace(/\D/g, '');
+    if (!clientPhone || clientPhone.length !== 11) {
+      toast.error("Telefone do cliente não cadastrado. Edite o orçamento e adicione.");
+      return;
+    }
+
+    setSending(true);
+    try {
+      // Get user profile for WhatsApp and name
+      const profile = await getProfile();
+      const userWhatsapp = profile?.whatsapp ? maskWhatsApp(profile.whatsapp) : '';
+      const userName = profile?.fullName || quote.companyInfo.name || 'Empresa';
+
+      // Generate PDF
+      const doc = generateQuotePdf(quote, userWhatsapp);
+      const pdfBlob = doc.output('blob');
+      const fileName = `orcamento-${quote.clientName.replace(/\s+/g, '-').toLowerCase()}-${id.slice(0, 8)}.pdf`;
+
+      // Upload to storage
+      let pdfUrl = '';
+      try {
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('quote-pdfs')
+          .upload(fileName, pdfBlob, { contentType: 'application/pdf', upsert: true });
+
+        if (!uploadError && uploadData) {
+          const { data: urlData } = supabase.storage.from('quote-pdfs').getPublicUrl(fileName);
+          pdfUrl = urlData.publicUrl;
+        }
+      } catch {
+        // fallback below
+      }
+
+      // Build WhatsApp message
+      let message: string;
+      if (pdfUrl) {
+        message = `Olá ${quote.clientName}! Segue o orçamento conforme solicitado: ${pdfUrl}\n\nQualquer dúvida estou à disposição!\nAtt, ${userName}`;
+      } else {
+        // Fallback: text-based quote
+        message = buildWhatsAppText(quote, userName);
+      }
+
+      const encoded = encodeURIComponent(message);
+      window.open(`https://wa.me/55${clientPhone}?text=${encoded}`, '_blank');
+
+      // Update status to 'enviado'
+      await changeQuoteStatus(id, 'enviado');
+      setQuote({ ...quote, status: 'enviado' });
+      toast.success('Orçamento enviado! Status alterado para "Enviado".');
+    } catch (err) {
+      toast.error("Erro ao enviar orçamento.");
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleApprove = async () => {
@@ -128,8 +181,9 @@ const QuoteDetail = () => {
         {/* ===== ACTION BUTTONS BY STAGE ===== */}
         <div className="flex gap-2 flex-wrap">
           {currentStatus === 'orcado' && (
-            <Button className="flex-1 gap-2" onClick={handleSendWhatsApp}>
-              <Send className="h-4 w-4" /> Enviar para Cliente (WhatsApp)
+            <Button className="flex-1 gap-2" onClick={handleSendWhatsApp} disabled={sending}>
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Enviar para Cliente (WhatsApp)
             </Button>
           )}
 
@@ -192,6 +246,12 @@ const QuoteDetail = () => {
                     <td className="px-3 py-2 font-bold text-[hsl(215,10%,45%)] w-20 text-right">Data:</td>
                     <td className="px-3 py-2 text-right w-28">{date}</td>
                   </tr>
+                  {quote.clientPhone && (
+                    <tr className="border-b border-[hsl(214,20%,88%)]">
+                      <td className="px-3 py-2 font-bold text-[hsl(215,10%,45%)]">Telefone:</td>
+                      <td className="px-3 py-2" colSpan={3}>{maskWhatsApp(quote.clientPhone)}</td>
+                    </tr>
+                  )}
                   {quote.jobType && (
                     <tr>
                       <td className="px-3 py-2 font-bold text-[hsl(215,10%,45%)]">Tipo:</td>
@@ -256,7 +316,7 @@ const QuoteDetail = () => {
             </div>
 
             <div className="mb-8 text-sm text-[hsl(215,10%,45%)] space-y-1">
-              <p className="font-bold">- PROPOSTA VÁLIDA POR DEZ DIAS ÚTEIS;</p>
+              <p className="font-bold">- PROPOSTA VÁLIDA POR 7 (SETE) DIAS ÚTEIS;</p>
               <p className="font-bold">- CONDIÇÕES DE PAGAMENTO A COMBINAR;</p>
               {quote.notes && (
                 <div className="mt-3 whitespace-pre-wrap text-[hsl(215,25%,15%)]">
@@ -282,7 +342,7 @@ const QuoteDetail = () => {
   );
 };
 
-function buildWhatsAppText(q: Quote): string {
+function buildWhatsAppText(q: Quote, userName: string): string {
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const lines: string[] = [];
   if (q.companyInfo.name) lines.push(`*${q.companyInfo.name}*`);
@@ -301,7 +361,7 @@ function buildWhatsAppText(q: Quote): string {
   lines.push("");
   lines.push(`💰 *Total: ${fmt(q.total)}*`);
   lines.push("");
-  lines.push("Segue o orçamento conforme solicitado. Qualquer dúvida estou à disposição!");
+  lines.push(`Qualquer dúvida estou à disposição!\nAtt, ${userName}`);
   if (q.notes) {
     lines.push("");
     lines.push(`Obs: ${q.notes}`);

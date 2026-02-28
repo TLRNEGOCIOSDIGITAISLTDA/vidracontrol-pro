@@ -19,6 +19,7 @@ import CostCenter from "./pages/CostCenter";
 import QuoteList from "./pages/QuoteList";
 import NewQuote from "./pages/NewQuote";
 import QuoteDetail from "./pages/QuoteDetail";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ const App = () => (
           <Route path="/app/orcamentos" element={<ProtectedRoute><QuoteList /></ProtectedRoute>} />
           <Route path="/app/novo-orcamento" element={<ProtectedRoute><NewQuote /></ProtectedRoute>} />
           <Route path="/app/orcamento/:id" element={<ProtectedRoute><QuoteDetail /></ProtectedRoute>} />
+          <Route path="/app/perfil" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
