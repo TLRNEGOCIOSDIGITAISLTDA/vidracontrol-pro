@@ -135,3 +135,9 @@ export function deleteQuoteCost(quoteId: string, costId: string) {
   quote.costs = quote.costs.filter(c => c.id !== costId);
   saveQuotes(quotes);
 }
+
+// ---- Clear all data (keeps company info & catalog) ----
+export function clearAllData() {
+  localStorage.removeItem(STORAGE_KEY);   // jobs
+  localStorage.removeItem(QUOTES_KEY);    // quotes
+}

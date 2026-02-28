@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronDown, Wallet } from "lucide-react";
+import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronDown, Wallet, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { useData } from "@/lib/DataContext";
+import { clearAllData } from "@/lib/storage";
 import { QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS, QUOTE_STATUS_BG } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { toast } from "sonner";
 
 const ALL_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'fechado', 'perdido'];
 const ACTIVE_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'perdido'];
@@ -310,6 +312,23 @@ const AppDashboard = () => {
               )}
             </div>
           </div>
+        </div>
+        {/* Reset button */}
+        <div className="text-center pt-4 pb-8">
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive border-destructive/30 hover:bg-destructive/10 gap-2"
+            onClick={() => {
+              if (confirm("Apagar TODOS os orçamentos, obras e custos? Os dados da empresa serão mantidos.")) {
+                clearAllData();
+                refreshAll();
+                toast.success("Dados limpos! Sistema zerado para novo teste.");
+              }
+            }}
+          >
+            <Trash2 className="h-4 w-4" /> Limpar dados de teste
+          </Button>
         </div>
       </div>
     </div>
