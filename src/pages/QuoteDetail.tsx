@@ -1,16 +1,19 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
-import { Share2, Trash2, CheckCircle, Clock } from "lucide-react";
+import { Share2, Trash2, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { getQuote, deleteQuote, getQuotes, saveQuotes } from "@/lib/storage";
-import { Quote } from "@/lib/types";
+import { Quote, QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from "@/lib/types";
 import { toast } from "sonner";
+
+const ALL_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'fechado', 'perdido'];
 
 const QuoteDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [quote, setQuote] = useState<Quote | null>(null);
+  const [statusOpen, setStatusOpen] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,16 +39,16 @@ const QuoteDetail = () => {
     }
   };
 
-  const handleToggleStatus = () => {
+  const handleChangeStatus = (newStatus: QuoteStatus) => {
     if (!quote || !id) return;
-    const newStatus = (quote.status || "orcado") === "orcado" ? "fechado" : "orcado";
     const quotes = getQuotes();
     const idx = quotes.findIndex((q) => q.id === id);
     if (idx !== -1) {
       quotes[idx] = { ...quotes[idx], status: newStatus };
       saveQuotes(quotes);
       setQuote({ ...quote, status: newStatus });
-      toast.success(newStatus === "fechado" ? "Orçamento marcado como fechado!" : "Orçamento marcado como orçado.");
+      toast.success(`Status alterado para "${QUOTE_STATUS_LABELS[newStatus]}".`);
+      setStatusOpen(false);
     }
   };
 
@@ -74,17 +77,32 @@ const QuoteDetail = () => {
       <div className="container py-6 max-w-2xl space-y-4">
         {/* Actions */}
         <div className="flex gap-2">
-          <Button
-            variant={(quote.status || "orcado") === "fechado" ? "default" : "outline"}
-            className="flex-1"
-            onClick={handleToggleStatus}
-          >
-            {(quote.status || "orcado") === "fechado" ? (
-              <><CheckCircle className="h-4 w-4 mr-2" /> Fechado</>
-            ) : (
-              <><Clock className="h-4 w-4 mr-2" /> Orçado</>
+          <div className="relative flex-1">
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={() => setStatusOpen(!statusOpen)}
+              style={{ borderColor: QUOTE_STATUS_COLORS[(quote.status || 'orcado') as QuoteStatus], color: QUOTE_STATUS_COLORS[(quote.status || 'orcado') as QuoteStatus] }}
+            >
+              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: QUOTE_STATUS_COLORS[(quote.status || 'orcado') as QuoteStatus] }} />
+              {QUOTE_STATUS_LABELS[(quote.status || 'orcado') as QuoteStatus]}
+              <ChevronDown className={`h-4 w-4 transition-transform ${statusOpen ? 'rotate-180' : ''}`} />
+            </Button>
+            {statusOpen && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-card rounded-lg shadow-elevated border border-border z-50 overflow-hidden">
+                {ALL_STATUSES.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => handleChangeStatus(s)}
+                    className={`flex items-center gap-2 w-full px-3 py-2.5 text-sm hover:bg-muted transition-colors ${(quote.status || 'orcado') === s ? 'bg-muted font-bold' : ''}`}
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: QUOTE_STATUS_COLORS[s] }} />
+                    {QUOTE_STATUS_LABELS[s]}
+                  </button>
+                ))}
+              </div>
             )}
-          </Button>
+          </div>
           <Button variant="outline" className="flex-1" onClick={handleShare}>
             <Share2 className="h-4 w-4 mr-2" /> Compartilhar
           </Button>
