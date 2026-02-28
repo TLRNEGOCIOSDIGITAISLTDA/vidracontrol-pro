@@ -1,27 +1,45 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronDown, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
-import { getJobs, getQuotes } from "@/lib/storage";
-import { Job, Quote, QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS, QUOTE_STATUS_BG } from "@/lib/types";
-import { motion } from "framer-motion";
+import { useData } from "@/lib/DataContext";
+import { QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS, QUOTE_STATUS_BG } from "@/lib/types";
+import { motion, AnimatePresence } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 const ALL_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'fechado', 'perdido'];
 
-const AppDashboard = () => {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [quotes, setQuotes] = useState<Quote[]>([]);
+const HighlightCard = ({ children, className = "", lastUpdate }: { children: React.ReactNode; className?: string; lastUpdate: number }) => {
+  const [flash, setFlash] = useState(false);
+  const mountRef = useRef(lastUpdate);
 
   useEffect(() => {
-    setJobs(getJobs());
-    setQuotes(getQuotes());
-  }, []);
+    if (lastUpdate !== mountRef.current) {
+      mountRef.current = lastUpdate;
+      setFlash(true);
+      const t = setTimeout(() => setFlash(false), 1000);
+      return () => clearTimeout(t);
+    }
+  }, [lastUpdate]);
 
-  const totalSales = jobs.reduce((s, j) => s + j.saleValue, 0);
-  const totalExpenses = jobs.reduce((s, j) => s + j.expenses.reduce((es, e) => es + e.value, 0), 0);
-  const totalProfit = totalSales - totalExpenses;
+  return (
+    <div className={`bg-card rounded-xl p-4 shadow-card transition-all duration-500 ${flash ? "ring-2 ring-success/50 shadow-[0_0_12px_hsl(var(--success)/0.3)]" : ""} ${className}`}>
+      {children}
+    </div>
+  );
+};
+
+const AppDashboard = () => {
+  const { jobs, quotes, refreshAll, lastUpdate } = useData();
+
+  useEffect(() => { refreshAll(); }, [refreshAll]);
+
+  // Sales/Costs/Profit from closed quotes (Centro de Custo)
+  const closedQuotes = quotes.filter(q => q.status === "fechado");
+  const totalSales = closedQuotes.reduce((s, q) => s + q.total, 0);
+  const totalCosts = closedQuotes.reduce((s, q) => s + (q.costs || []).reduce((cs, c) => cs + c.value, 0), 0);
+  const totalProfit = totalSales - totalCosts;
 
   const fmt = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -55,38 +73,35 @@ const AppDashboard = () => {
       <AppHeader />
 
       <div className="container py-6 space-y-6">
-        {/* Summary cards */}
+        {/* Summary cards — synced with Centro de Custo */}
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-card rounded-xl p-4 shadow-card">
+          <HighlightCard lastUpdate={lastUpdate}>
             <DollarSign className="h-4 w-4 text-muted-foreground mb-1" />
             <div className="text-xs text-muted-foreground">Vendas</div>
             <div className="text-sm font-bold text-foreground truncate">{fmt(totalSales)}</div>
-          </div>
-          <div className="bg-card rounded-xl p-4 shadow-card">
+          </HighlightCard>
+          <HighlightCard lastUpdate={lastUpdate}>
             <TrendingDown className="h-4 w-4 text-secondary mb-1" />
             <div className="text-xs text-muted-foreground">Custos</div>
-            <div className="text-sm font-bold text-secondary truncate">{fmt(totalExpenses)}</div>
-          </div>
-          <div className="bg-card rounded-xl p-4 shadow-card">
+            <div className="text-sm font-bold text-secondary truncate">{fmt(totalCosts)}</div>
+          </HighlightCard>
+          <HighlightCard lastUpdate={lastUpdate}>
             <TrendingUp className="h-4 w-4 text-success mb-1" />
             <div className="text-xs text-muted-foreground">Lucro</div>
             <div className={`text-sm font-bold truncate ${totalProfit >= 0 ? "text-success" : "text-destructive"}`}>
               {fmt(totalProfit)}
             </div>
-          </div>
+          </HighlightCard>
         </div>
 
-        {/* Gráficos de pizza — Seção independente */}
+        {/* Gráficos de pizza */}
         {hasQuotes && (
           <div>
             <h2 className="text-lg font-bold text-foreground mb-3">Orçamentos — Visão Geral</h2>
             <div className="bg-card rounded-xl shadow-card p-4">
               <div className="grid grid-cols-2 gap-4">
-                {/* Quantity chart */}
                 <div>
-                  <h4 className="text-[10px] font-bold text-muted-foreground text-center mb-1 uppercase tracking-wide">
-                    Quantidade
-                  </h4>
+                  <h4 className="text-[10px] font-bold text-muted-foreground text-center mb-1 uppercase tracking-wide">Quantidade</h4>
                   <div className="h-32">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -106,12 +121,8 @@ const AppDashboard = () => {
                     ))}
                   </div>
                 </div>
-
-                {/* Value chart */}
                 <div>
-                  <h4 className="text-[10px] font-bold text-muted-foreground text-center mb-1 uppercase tracking-wide">
-                    Valores (R$)
-                  </h4>
+                  <h4 className="text-[10px] font-bold text-muted-foreground text-center mb-1 uppercase tracking-wide">Valores (R$)</h4>
                   <div className="h-32">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -136,41 +147,26 @@ const AppDashboard = () => {
           </div>
         )}
 
-        {/* Seção Orçamentos — collapsed/expandable */}
+        {/* Seção Orçamentos */}
         <div>
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-foreground">Orçamentos</h2>
             <div className="flex items-center gap-2">
               <Link to="/app/novo-orcamento">
-                <Button size="sm">
-                  <Plus className="h-4 w-4 mr-1" /> Novo Orçamento
-                </Button>
+                <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Orçamento</Button>
               </Link>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setQuotesOpen(!quotesOpen)}
-                className="gap-1"
-              >
+              <Button size="sm" variant="outline" onClick={() => setQuotesOpen(!quotesOpen)} className="gap-1">
                 Ver todos
                 <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${quotesOpen ? "rotate-180" : ""}`} />
               </Button>
             </div>
           </div>
-
-          <div
-            className="overflow-hidden transition-all duration-300 ease-out"
-            style={{
-              maxHeight: quotesOpen ? `${quotes.length * 120 + quotesByStatus.length * 60 + 200}px` : "0px",
-              opacity: quotesOpen ? 1 : 0,
-            }}
-          >
+          <div className="overflow-hidden transition-all duration-300 ease-out" style={{ maxHeight: quotesOpen ? `${quotes.length * 120 + quotesByStatus.length * 60 + 200}px` : "0px", opacity: quotesOpen ? 1 : 0 }}>
             <div className="pt-3 space-y-4">
               {quotes.length === 0 ? (
                 <div className="text-center py-10">
                   <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
                   <p className="text-muted-foreground">Nenhum orçamento ainda.</p>
-                  <p className="text-muted-foreground text-sm">Crie um orçamento para começar!</p>
                 </div>
               ) : (
                 quotesByStatus.filter(g => g.count > 0).map((group) => (
@@ -182,19 +178,12 @@ const AppDashboard = () => {
                     </div>
                     <div className="space-y-2">
                       {group.quotes.map((quote, i) => (
-                        <motion.div
-                          key={quote.id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: i * 0.03 }}
-                        >
+                        <motion.div key={quote.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
                           <Link to={`/app/orcamento/${quote.id}`}>
                             <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow">
                               <div className="flex items-center justify-between mb-2">
                                 <h3 className="font-bold text-foreground truncate">{quote.clientName}</h3>
-                                <span className={`text-xs px-2 py-1 rounded-full font-medium ${QUOTE_STATUS_BG[group.status]}`}>
-                                  {group.label}
-                                </span>
+                                <span className={`text-xs px-2 py-1 rounded-full font-medium ${QUOTE_STATUS_BG[group.status]}`}>{group.label}</span>
                               </div>
                               <div className="flex items-center gap-4 text-sm">
                                 <span className="text-muted-foreground">Total: <strong className="text-foreground">{fmt(quote.total)}</strong></span>
@@ -217,9 +206,7 @@ const AppDashboard = () => {
             <h2 className="text-lg font-bold text-foreground">Centro de Custo</h2>
             <div className="flex items-center gap-2">
               <Link to="/app/centro-de-custo">
-                <Button size="sm">
-                  <Wallet className="h-4 w-4 mr-1" /> Gerenciar
-                </Button>
+                <Button size="sm"><Wallet className="h-4 w-4 mr-1" /> Gerenciar</Button>
               </Link>
               <Button size="sm" variant="outline" onClick={() => setCostsOpen(!costsOpen)} className="gap-1">
                 Ver todos
@@ -227,26 +214,26 @@ const AppDashboard = () => {
               </Button>
             </div>
           </div>
-          <div className="overflow-hidden transition-all duration-300 ease-out" style={{ maxHeight: costsOpen ? `${jobs.length * 140 + 100}px` : "0px", opacity: costsOpen ? 1 : 0 }}>
+          <div className="overflow-hidden transition-all duration-300 ease-out" style={{ maxHeight: costsOpen ? `${closedQuotes.length * 140 + 100}px` : "0px", opacity: costsOpen ? 1 : 0 }}>
             <div className="pt-3 space-y-3">
-              {jobs.length === 0 ? (
+              {closedQuotes.length === 0 ? (
                 <div className="text-center py-10">
                   <Wallet className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
-                  <p className="text-muted-foreground">Nenhuma obra no centro de custo.</p>
+                  <p className="text-muted-foreground">Nenhum orçamento fechado no centro de custo.</p>
                 </div>
               ) : (
-                jobs.map((job, i) => {
-                  const exp = job.expenses.reduce((s, e) => s + e.value, 0);
-                  const profit = job.saleValue - exp;
+                closedQuotes.map((quote, i) => {
+                  const costs = (quote.costs || []).reduce((s, c) => s + c.value, 0);
+                  const profit = quote.total - costs;
                   return (
-                    <motion.div key={job.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-                      <Link to={`/app/centro-de-custo/obra/${job.id}`}>
+                    <motion.div key={quote.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+                      <Link to="/app/centro-de-custo">
                         <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow">
                           <div className="flex items-center justify-between mb-2">
-                            <h3 className="font-bold text-foreground truncate">{job.clientName}</h3>
+                            <h3 className="font-bold text-foreground truncate">{quote.clientName}</h3>
                           </div>
                           <div className="flex items-center gap-4 text-sm">
-                            <span className="text-muted-foreground">Gastos: <strong className="text-secondary">{fmt(exp)}</strong></span>
+                            <span className="text-muted-foreground">Venda: <strong className="text-foreground">{fmt(quote.total)}</strong></span>
                             <span className="text-muted-foreground">Lucro: <strong className={profit >= 0 ? "text-success" : "text-destructive"}>{fmt(profit)}</strong></span>
                           </div>
                         </div>
@@ -265,9 +252,7 @@ const AppDashboard = () => {
             <h2 className="text-lg font-bold text-foreground">Minhas Obras</h2>
             <div className="flex items-center gap-2">
               <Link to="/app/nova-obra">
-                <Button size="sm">
-                  <Plus className="h-4 w-4 mr-1" /> Nova Obra
-                </Button>
+                <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Nova Obra</Button>
               </Link>
               <Button size="sm" variant="outline" onClick={() => setJobsOpen(!jobsOpen)} className="gap-1">
                 Ver todos

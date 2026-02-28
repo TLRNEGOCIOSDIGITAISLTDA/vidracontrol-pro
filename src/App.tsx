@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
+import { DataProvider } from "./lib/DataContext";
 import Index from "./pages/Index";
 import AppDashboard from "./pages/AppDashboard";
 import NewJob from "./pages/NewJob";
@@ -20,6 +21,7 @@ const App = () => (
   <HelmetProvider>
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
+      <DataProvider>
       <Toaster />
       <Sonner />
       <BrowserRouter>
@@ -36,6 +38,7 @@ const App = () => (
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
+      </DataProvider>
     </TooltipProvider>
   </QueryClientProvider>
   </HelmetProvider>
