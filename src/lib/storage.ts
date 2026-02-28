@@ -1,4 +1,4 @@
-import { Job, Expense, Quote, CompanyInfo, QuoteCost } from './types';
+import { Job, Expense, Quote, CompanyInfo, QuoteCost, JobItem } from './types';
 
 const STORAGE_KEY = 'vidraceiro-jobs';
 
@@ -11,13 +11,14 @@ export function saveJobs(jobs: Job[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
 }
 
-export function addJob(job: Omit<Job, 'id' | 'createdAt' | 'expenses'>): Job {
+export function addJob(job: Omit<Job, 'id' | 'createdAt' | 'expenses'> & { items?: JobItem[] }): Job {
   const jobs = getJobs();
   const newJob: Job = {
     ...job,
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
     expenses: [],
+    items: job.items || [],
   };
   jobs.unshift(newJob);
   saveJobs(jobs);
