@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronDown, Wallet, Trash2 } from "lucide-react";
+import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronDown, Wallet, Trash2, Percent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { useData } from "@/lib/DataContext";
@@ -43,6 +43,7 @@ const AppDashboard = () => {
   const totalSales = closedQuotes.reduce((s, q) => s + q.total, 0);
   const totalCosts = closedQuotes.reduce((s, q) => s + (q.costs || []).reduce((cs, c) => cs + c.value, 0), 0);
   const totalProfit = totalSales - totalCosts;
+  const avgMargin = totalSales > 0 ? ((totalProfit / totalSales) * 100) : 0;
 
   const fmt = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -91,7 +92,7 @@ const AppDashboard = () => {
 
       <div className="container py-6 space-y-6">
         {/* Summary cards — synced with Centro de Custo */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <HighlightCard lastUpdate={lastUpdate}>
             <DollarSign className="h-4 w-4 text-muted-foreground mb-1" />
             <div className="text-xs text-muted-foreground">Vendas</div>
@@ -108,6 +109,11 @@ const AppDashboard = () => {
             <div className={`text-sm font-bold truncate ${totalProfit >= 0 ? "text-success" : "text-destructive"}`}>
               {fmt(totalProfit)}
             </div>
+          </HighlightCard>
+          <HighlightCard lastUpdate={lastUpdate}>
+            <Percent className="h-4 w-4 text-primary mb-1" />
+            <div className="text-xs text-muted-foreground">Margem Média</div>
+            <div className="text-sm font-bold text-primary truncate">{avgMargin.toFixed(1)}%</div>
           </HighlightCard>
         </div>
 
