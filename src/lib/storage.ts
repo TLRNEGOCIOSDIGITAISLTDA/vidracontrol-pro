@@ -1,4 +1,4 @@
-import { Job, Expense, Quote, CompanyInfo } from './types';
+import { Job, Expense, Quote, CompanyInfo, QuoteCost } from './types';
 
 const STORAGE_KEY = 'vidraceiro-jobs';
 
@@ -107,5 +107,30 @@ export function getQuote(id: string): Quote | undefined {
 
 export function deleteQuote(id: string) {
   const quotes = getQuotes().filter(q => q.id !== id);
+  saveQuotes(quotes);
+}
+
+// ---- Quote Costs ----
+export function addQuoteCost(quoteId: string, cost: Omit<QuoteCost, 'id' | 'quoteId' | 'createdAt'>): QuoteCost | null {
+  const quotes = getQuotes();
+  const quote = quotes.find(q => q.id === quoteId);
+  if (!quote) return null;
+  const newCost: QuoteCost = {
+    ...cost,
+    id: crypto.randomUUID(),
+    quoteId,
+    createdAt: new Date().toISOString(),
+  };
+  if (!quote.costs) quote.costs = [];
+  quote.costs.push(newCost);
+  saveQuotes(quotes);
+  return newCost;
+}
+
+export function deleteQuoteCost(quoteId: string, costId: string) {
+  const quotes = getQuotes();
+  const quote = quotes.find(q => q.id === quoteId);
+  if (!quote || !quote.costs) return;
+  quote.costs = quote.costs.filter(c => c.id !== costId);
   saveQuotes(quotes);
 }

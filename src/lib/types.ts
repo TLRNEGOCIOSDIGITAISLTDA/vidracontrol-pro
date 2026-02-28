@@ -114,6 +114,25 @@ export const QUOTE_STATUS_BG: Record<QuoteStatus, string> = {
   perdido: 'bg-destructive/10 text-destructive',
 };
 
+export type QuoteCostCategory = 'material' | 'mao_de_obra' | 'frete' | 'outros';
+
+export const QUOTE_COST_CATEGORY_LABELS: Record<QuoteCostCategory, string> = {
+  material: 'Material',
+  mao_de_obra: 'Mão de obra',
+  frete: 'Frete',
+  outros: 'Outros',
+};
+
+export interface QuoteCost {
+  id: string;
+  quoteId: string;
+  description: string;
+  category: QuoteCostCategory;
+  value: number;
+  date: string;
+  createdAt: string;
+}
+
 export interface Quote {
   id: string;
   clientName: string;
@@ -124,4 +143,5 @@ export interface Quote {
   createdAt: string;
   notes?: string;
   status?: QuoteStatus;
+  costs?: QuoteCost[];
 }
