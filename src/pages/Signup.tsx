@@ -6,9 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calculator, Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
+import { maskWhatsApp, isValidWhatsApp } from "@/lib/whatsappMask";
 
 const Signup = () => {
   const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -19,8 +22,12 @@ const Signup = () => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password) return;
+    if (!email.trim() || !password || !fullName.trim()) return;
 
+    if (!isValidWhatsApp(whatsapp)) {
+      toast.error("Informe um número de WhatsApp válido.");
+      return;
+    }
     if (!passwordValid) {
       toast.error("A senha deve ter no mínimo 8 caracteres, com letras e números.");
       return;
@@ -31,7 +38,7 @@ const Signup = () => {
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: { emailRedirectTo: window.location.origin },
@@ -41,6 +48,15 @@ const Signup = () => {
     if (error) {
       toast.error(error.message);
       return;
+    }
+
+    // Save profile with WhatsApp
+    if (data.user) {
+      await supabase.from('profiles' as any).insert({
+        user_id: data.user.id,
+        whatsapp: whatsapp.replace(/\D/g, ''),
+        full_name: fullName.trim(),
+      } as any);
     }
 
     setSuccess(true);
@@ -76,14 +92,34 @@ const Signup = () => {
 
         <form onSubmit={handleSignup} className="space-y-4">
           <div className="space-y-2">
+            <Label htmlFor="fullName">Nome Completo</Label>
+            <Input id="fullName" placeholder="Seu nome" value={fullName} onChange={e => setFullName(e.target.value)} required />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+            <Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="whatsapp">WhatsApp</Label>
+            <Input
+              id="whatsapp"
+              placeholder="(00) 00000-0000"
+              value={whatsapp}
+              onChange={e => setWhatsapp(maskWhatsApp(e.target.value))}
+              required
+              inputMode="tel"
+            />
+            {whatsapp && !isValidWhatsApp(whatsapp) && (
+              <p className="text-xs text-destructive">Número incompleto</p>
+            )}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="password">Senha</Label>
             <div className="relative">
-              <Input id="password" type={showPw ? "text" : "password"} placeholder="Mínimo 8 caracteres" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" />
+              <Input id="password" type={showPw ? "text" : "password"} placeholder="Mínimo 8 caracteres" value={password} onChange={e => setPassword(e.target.value)} required autoComplete="new-password" />
               <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" onClick={() => setShowPw(!showPw)}>
                 {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -97,10 +133,10 @@ const Signup = () => {
 
           <div className="space-y-2">
             <Label htmlFor="confirmPw">Confirmar Senha</Label>
-            <Input id="confirmPw" type="password" placeholder="Repita a senha" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} required autoComplete="new-password" />
+            <Input id="confirmPw" type="password" placeholder="Repita a senha" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} required autoComplete="new-password" />
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading || !passwordValid}>
+          <Button type="submit" className="w-full" disabled={loading || !passwordValid || !isValidWhatsApp(whatsapp)}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Criar Conta
           </Button>

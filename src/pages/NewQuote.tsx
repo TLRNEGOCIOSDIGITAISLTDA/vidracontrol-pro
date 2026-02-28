@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Trash2 } from "lucide-react";
+import { maskWhatsApp, isValidWhatsApp } from "@/lib/whatsappMask";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +26,7 @@ const NewQuote = () => {
   const navigate = useNavigate();
   const [company, setCompany] = useState<CompanyInfo>({ name: '', cnpjCpf: '', phone: '', email: '', address: '' });
   const [clientName, setClientName] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
   const [jobType, setJobType] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<QuoteItem[]>([
@@ -87,6 +89,10 @@ const NewQuote = () => {
       toast.error("Preencha o nome do cliente.");
       return;
     }
+    if (!isValidWhatsApp(clientPhone)) {
+      toast.error("Preencha o telefone do cliente para poder enviar pelo WhatsApp.");
+      return;
+    }
     if (items.length === 0) {
       toast.error("Adicione pelo menos um item.");
       return;
@@ -94,6 +100,7 @@ const NewQuote = () => {
     await saveCompanyInfo(company);
     const quote = await addQuote({
       clientName: clientName.trim(),
+      clientPhone: clientPhone.replace(/\D/g, ''),
       jobType,
       items,
       total,
@@ -152,6 +159,19 @@ const NewQuote = () => {
           <div>
             <Label>Nome do Cliente</Label>
             <Input className="mt-1" value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Ex: Maria da Silva" />
+          </div>
+          <div>
+            <Label>Telefone do Cliente (WhatsApp)</Label>
+            <Input
+              className="mt-1"
+              value={clientPhone}
+              onChange={e => setClientPhone(maskWhatsApp(e.target.value))}
+              placeholder="(00) 00000-0000"
+              inputMode="tel"
+            />
+            {clientPhone && !isValidWhatsApp(clientPhone) && (
+              <p className="text-xs text-destructive mt-1">Número incompleto</p>
+            )}
           </div>
           <div>
             <Label>Tipo da Obra</Label>
