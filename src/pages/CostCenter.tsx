@@ -1,16 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { DollarSign, TrendingDown, TrendingUp, Percent, Plus, ChevronDown, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
-import { getQuotes, addQuoteCost, deleteQuoteCost, saveQuotes } from "@/lib/storage";
-import { Quote, QuoteCost, QuoteCostCategory, QUOTE_COST_CATEGORY_LABELS } from "@/lib/types";
+import { useData } from "@/lib/DataContext";
+import { QuoteCostCategory, QUOTE_COST_CATEGORY_LABELS } from "@/lib/types";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
 const COST_CATEGORIES: QuoteCostCategory[] = ['material', 'mao_de_obra', 'frete', 'outros'];
 
 const CostCenter = () => {
-  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const { quotes, addCost, removeCost } = useData();
+  const closedQuotes = quotes.filter(q => q.status === "fechado");
+
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState<string | null>(null);
 
@@ -20,19 +22,12 @@ const CostCenter = () => {
   const [costValue, setCostValue] = useState("");
   const [costDate, setCostDate] = useState(() => new Date().toISOString().slice(0, 10));
 
-  const reload = () => {
-    const all = getQuotes().filter(q => q.status === "fechado");
-    setQuotes(all);
-  };
-
-  useEffect(() => { reload(); }, []);
-
   const fmt = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   // Totals
-  const totalSales = quotes.reduce((s, q) => s + q.total, 0);
-  const totalCosts = quotes.reduce((s, q) => s + (q.costs || []).reduce((cs, c) => cs + c.value, 0), 0);
+  const totalSales = closedQuotes.reduce((s, q) => s + q.total, 0);
+  const totalCosts = closedQuotes.reduce((s, q) => s + (q.costs || []).reduce((cs, c) => cs + c.value, 0), 0);
   const totalProfit = totalSales - totalCosts;
   const avgMargin = totalSales > 0 ? ((totalProfit / totalSales) * 100) : 0;
 
@@ -42,7 +37,7 @@ const CostCenter = () => {
       toast.error("Preencha todos os campos corretamente.");
       return;
     }
-    addQuoteCost(quoteId, {
+    addCost(quoteId, {
       description: costDesc.trim(),
       category: costCategory,
       value: val,
@@ -54,13 +49,11 @@ const CostCenter = () => {
     setCostCategory("material");
     setCostDate(new Date().toISOString().slice(0, 10));
     setFormOpen(null);
-    reload();
   };
 
   const handleDeleteCost = (quoteId: string, costId: string) => {
-    deleteQuoteCost(quoteId, costId);
+    removeCost(quoteId, costId);
     toast.success("Custo removido.");
-    reload();
   };
 
   const toggleExpand = (id: string) => {
@@ -103,7 +96,7 @@ const CostCenter = () => {
         <div>
           <h2 className="text-lg font-bold text-foreground mb-3">Orçamentos Fechados</h2>
 
-          {quotes.length === 0 ? (
+          {closedQuotes.length === 0 ? (
             <div className="text-center py-16">
               <DollarSign className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
               <p className="text-muted-foreground">Nenhum orçamento fechado ainda.</p>
@@ -111,7 +104,7 @@ const CostCenter = () => {
             </div>
           ) : (
             <div className="space-y-3">
-              {quotes.map((quote, i) => {
+              {closedQuotes.map((quote, i) => {
                 const costs = quote.costs || [];
                 const totalQuoteCosts = costs.reduce((s, c) => s + c.value, 0);
                 const profit = quote.total - totalQuoteCosts;
@@ -121,24 +114,13 @@ const CostCenter = () => {
                 const hasCosts = costs.length > 0;
 
                 return (
-                  <motion.div
-                    key={quote.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                  >
+                  <motion.div key={quote.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
                     <div className="bg-card rounded-xl shadow-card overflow-hidden">
-                      {/* Header */}
-                      <button
-                        onClick={() => toggleExpand(quote.id)}
-                        className="w-full px-4 pt-4 pb-3 text-left hover:bg-muted/30 transition-colors"
-                      >
+                      <button onClick={() => toggleExpand(quote.id)} className="w-full px-4 pt-4 pb-3 text-left hover:bg-muted/30 transition-colors">
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="font-bold text-foreground truncate">{quote.clientName}</h3>
                           <div className="flex items-center gap-2">
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                              hasCosts ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
-                            }`}>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${hasCosts ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
                               {hasCosts ? "Com custo" : "Sem custo"}
                             </span>
                             <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`} />
@@ -155,37 +137,21 @@ const CostCenter = () => {
                           </div>
                           <div>
                             <span className="text-muted-foreground">Lucro</span>
-                            <div className={`font-bold ${profit >= 0 ? "text-success" : "text-destructive"}`}>
-                              {fmt(profit)}
-                            </div>
+                            <div className={`font-bold ${profit >= 0 ? "text-success" : "text-destructive"}`}>{fmt(profit)}</div>
                           </div>
                         </div>
                       </button>
 
-                      {/* Expanded content */}
-                      <div
-                        className="overflow-hidden transition-all duration-300 ease-out"
-                        style={{
-                          maxHeight: isExpanded ? "2000px" : "0px",
-                          opacity: isExpanded ? 1 : 0,
-                        }}
-                      >
+                      <div className="overflow-hidden transition-all duration-300 ease-out" style={{ maxHeight: isExpanded ? "2000px" : "0px", opacity: isExpanded ? 1 : 0 }}>
                         <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
-                          {/* Margin bar */}
                           <div className="flex items-center gap-2 text-xs">
                             <span className="text-muted-foreground">Margem:</span>
                             <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all ${margin >= 0 ? "bg-success" : "bg-destructive"}`}
-                                style={{ width: `${Math.min(Math.max(margin, 0), 100)}%` }}
-                              />
+                              <div className={`h-full rounded-full transition-all ${margin >= 0 ? "bg-success" : "bg-destructive"}`} style={{ width: `${Math.min(Math.max(margin, 0), 100)}%` }} />
                             </div>
-                            <span className={`font-bold ${margin >= 0 ? "text-success" : "text-destructive"}`}>
-                              {margin.toFixed(1)}%
-                            </span>
+                            <span className={`font-bold ${margin >= 0 ? "text-success" : "text-destructive"}`}>{margin.toFixed(1)}%</span>
                           </div>
 
-                          {/* Existing costs */}
                           {hasCosts && (
                             <div className="space-y-2">
                               <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Custos inseridos</h4>
@@ -199,10 +165,7 @@ const CostCenter = () => {
                                   </div>
                                   <div className="flex items-center gap-2 ml-2">
                                     <span className="text-sm font-bold text-secondary">{fmt(cost.value)}</span>
-                                    <button
-                                      onClick={() => handleDeleteCost(quote.id, cost.id)}
-                                      className="text-muted-foreground hover:text-destructive transition-colors"
-                                    >
+                                    <button onClick={() => handleDeleteCost(quote.id, cost.id)} className="text-muted-foreground hover:text-destructive transition-colors">
                                       <Trash2 className="h-3.5 w-3.5" />
                                     </button>
                                   </div>
@@ -211,63 +174,28 @@ const CostCenter = () => {
                             </div>
                           )}
 
-                          {/* Add cost button / form */}
                           {!isFormVisible ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="w-full gap-1"
-                              onClick={() => setFormOpen(quote.id)}
-                            >
+                            <Button size="sm" variant="outline" className="w-full gap-1" onClick={() => setFormOpen(quote.id)}>
                               <Plus className="h-4 w-4" /> Inserir Custo
                             </Button>
                           ) : (
                             <div className="bg-muted/30 rounded-lg p-3 space-y-3 border border-border">
                               <h4 className="text-xs font-bold text-foreground">Novo Custo</h4>
-                              <input
-                                type="text"
-                                placeholder="Descrição do custo"
-                                value={costDesc}
-                                onChange={(e) => setCostDesc(e.target.value)}
-                                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                              />
-                              <select
-                                value={costCategory}
-                                onChange={(e) => setCostCategory(e.target.value as QuoteCostCategory)}
-                                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                              >
-                                {COST_CATEGORIES.map((cat) => (
-                                  <option key={cat} value={cat}>{QUOTE_COST_CATEGORY_LABELS[cat]}</option>
-                                ))}
+                              <input type="text" placeholder="Descrição do custo" value={costDesc} onChange={(e) => setCostDesc(e.target.value)} className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                              <select value={costCategory} onChange={(e) => setCostCategory(e.target.value as QuoteCostCategory)} className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                {COST_CATEGORIES.map((cat) => (<option key={cat} value={cat}>{QUOTE_COST_CATEGORY_LABELS[cat]}</option>))}
                               </select>
                               <div className="grid grid-cols-2 gap-2">
-                                <input
-                                  type="text"
-                                  inputMode="decimal"
-                                  placeholder="Valor (R$)"
-                                  value={costValue}
-                                  onChange={(e) => setCostValue(e.target.value)}
-                                  className="bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                />
-                                <input
-                                  type="date"
-                                  value={costDate}
-                                  onChange={(e) => setCostDate(e.target.value)}
-                                  className="bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                />
+                                <input type="text" inputMode="decimal" placeholder="Valor (R$)" value={costValue} onChange={(e) => setCostValue(e.target.value)} className="bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                                <input type="date" value={costDate} onChange={(e) => setCostDate(e.target.value)} className="bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
                               </div>
                               <div className="flex gap-2">
-                                <Button size="sm" className="flex-1" onClick={() => handleSaveCost(quote.id)}>
-                                  Salvar
-                                </Button>
-                                <Button size="sm" variant="outline" className="flex-1" onClick={() => setFormOpen(null)}>
-                                  Cancelar
-                                </Button>
+                                <Button size="sm" className="flex-1" onClick={() => handleSaveCost(quote.id)}>Salvar</Button>
+                                <Button size="sm" variant="outline" className="flex-1" onClick={() => setFormOpen(null)}>Cancelar</Button>
                               </div>
                             </div>
                           )}
 
-                          {/* Summary */}
                           <div className="bg-muted/30 rounded-lg p-3 border border-border">
                             <div className="grid grid-cols-3 gap-2 text-xs text-center">
                               <div>

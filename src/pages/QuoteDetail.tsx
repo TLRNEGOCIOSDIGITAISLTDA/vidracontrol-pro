@@ -4,6 +4,7 @@ import { Share2, Trash2, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { getQuote, deleteQuote, getQuotes, saveQuotes } from "@/lib/storage";
+import { useData } from "@/lib/DataContext";
 import { Quote, QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from "@/lib/types";
 import { toast } from "sonner";
 
@@ -12,6 +13,7 @@ const ALL_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'fechado
 const QuoteDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { refreshQuotes } = useData();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [statusOpen, setStatusOpen] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
@@ -47,6 +49,7 @@ const QuoteDetail = () => {
       quotes[idx] = { ...quotes[idx], status: newStatus };
       saveQuotes(quotes);
       setQuote({ ...quote, status: newStatus });
+      refreshQuotes();
       toast.success(`Status alterado para "${QUOTE_STATUS_LABELS[newStatus]}".`);
       setStatusOpen(false);
     }
