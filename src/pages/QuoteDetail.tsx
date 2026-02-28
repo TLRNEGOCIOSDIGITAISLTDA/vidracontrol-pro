@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { Share2, Trash2, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
-import { getQuote, deleteQuote, getQuotes, saveQuotes } from "@/lib/storage";
+import { getQuote, deleteQuote } from "@/lib/storage";
 import { useData } from "@/lib/DataContext";
 import { Quote, QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from "@/lib/types";
 import { toast } from "sonner";
@@ -13,7 +13,7 @@ const ALL_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'fechado
 const QuoteDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { refreshQuotes } = useData();
+  const { refreshQuotes, changeQuoteStatus } = useData();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [statusOpen, setStatusOpen] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
@@ -43,15 +43,14 @@ const QuoteDetail = () => {
 
   const handleChangeStatus = (newStatus: QuoteStatus) => {
     if (!quote || !id) return;
-    const quotes = getQuotes();
-    const idx = quotes.findIndex((q) => q.id === id);
-    if (idx !== -1) {
-      quotes[idx] = { ...quotes[idx], status: newStatus };
-      saveQuotes(quotes);
-      setQuote({ ...quote, status: newStatus });
-      refreshQuotes();
+    changeQuoteStatus(id, newStatus);
+    setQuote({ ...quote, status: newStatus });
+    setStatusOpen(false);
+    if (newStatus === 'fechado') {
+      toast.success("Orçamento aprovado! Obra criada automaticamente em Minhas Obras. 🎉");
+      navigate("/app");
+    } else {
       toast.success(`Status alterado para "${QUOTE_STATUS_LABELS[newStatus]}".`);
-      setStatusOpen(false);
     }
   };
 
