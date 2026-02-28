@@ -1,6 +1,26 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Job, Expense, Quote, CompanyInfo, QuoteCost, JobItem, QuoteItem } from './types';
 
+async function getUserId(): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  return user.id;
+}
+
+// ---- Audit helper ----
+export async function logAudit(action: string, entityType?: string, entityId?: string, details?: Record<string, unknown>) {
+  try {
+    const uid = await getUserId();
+    await supabase.from('audit_logs' as any).insert({
+      user_id: uid,
+      action,
+      entity_type: entityType || null,
+      entity_id: entityId || null,
+      details: details || {},
+    } as any);
+  } catch { /* silent */ }
+}
+
 // ---- Quotes ----
 
 export async function getQuotes(): Promise<Quote[]> {
@@ -55,6 +75,7 @@ export async function getQuote(id: string): Promise<Quote | undefined> {
 }
 
 export async function addQuote(quote: Omit<Quote, 'id' | 'createdAt'>): Promise<Quote> {
+  const uid = await getUserId();
   const { data: row, error } = await supabase.from('quotes').insert({
     client_name: quote.clientName,
     job_type: quote.jobType || null,
@@ -62,6 +83,7 @@ export async function addQuote(quote: Omit<Quote, 'id' | 'createdAt'>): Promise<
     notes: quote.notes || null,
     status: quote.status || 'orcado',
     company_info: quote.companyInfo as any,
+    user_id: uid,
   }).select().single();
 
   if (error || !row) throw new Error(error?.message || 'Failed to create quote');
@@ -78,33 +100,40 @@ export async function addQuote(quote: Omit<Quote, 'id' | 'createdAt'>): Promise<
         quantity: i.quantity,
         unit_price: i.unitPrice,
         total: i.total,
+        user_id: uid,
       }))
     );
   }
 
+  await logAudit('create', 'quote', row.id, { clientName: quote.clientName });
   return { ...quote, id: row.id, createdAt: row.created_at, costs: [] } as Quote;
 }
 
 export async function deleteQuote(id: string) {
   await supabase.from('quotes').delete().eq('id', id);
+  await logAudit('delete', 'quote', id);
 }
 
 export async function saveQuoteStatus(quoteId: string, status: string) {
   await supabase.from('quotes').update({ status }).eq('id', quoteId);
+  await logAudit('update_status', 'quote', quoteId, { status });
 }
 
 // ---- Quote Costs ----
 
 export async function addQuoteCost(quoteId: string, cost: Omit<QuoteCost, 'id' | 'quoteId' | 'createdAt'>): Promise<QuoteCost | null> {
+  const uid = await getUserId();
   const { data, error } = await supabase.from('quote_costs').insert({
     quote_id: quoteId,
     description: cost.description,
     category: cost.category,
     value: cost.value,
     date: cost.date,
+    user_id: uid,
   }).select().single();
 
   if (error || !data) return null;
+  await logAudit('create', 'quote_cost', data.id, { quoteId, value: cost.value });
   return {
     id: data.id,
     quoteId: data.quote_id,
@@ -118,6 +147,7 @@ export async function addQuoteCost(quoteId: string, cost: Omit<QuoteCost, 'id' |
 
 export async function deleteQuoteCost(quoteId: string, costId: string) {
   await supabase.from('quote_costs').delete().eq('id', costId);
+  await logAudit('delete', 'quote_cost', costId, { quoteId });
 }
 
 // ---- Jobs ----
@@ -172,11 +202,13 @@ export async function getJob(id: string): Promise<Job | undefined> {
 }
 
 export async function addJob(job: Omit<Job, 'id' | 'createdAt' | 'expenses'> & { items?: JobItem[] }): Promise<Job> {
+  const uid = await getUserId();
   const { data: row, error } = await supabase.from('jobs').insert({
     client_name: job.clientName,
     description: job.description,
     sale_value: job.saleValue,
     status: job.status,
+    user_id: uid,
   }).select().single();
 
   if (error || !row) throw new Error(error?.message || 'Failed to create job');
@@ -193,10 +225,12 @@ export async function addJob(job: Omit<Job, 'id' | 'createdAt' | 'expenses'> & {
         unit_price: i.unitPrice,
         total: i.total,
         area: i.area || null,
+        user_id: uid,
       }))
     );
   }
 
+  await logAudit('create', 'job', row.id, { clientName: job.clientName });
   return {
     ...job,
     id: row.id,
@@ -214,23 +248,28 @@ export async function updateJob(id: string, data: Partial<Job>): Promise<Job | n
   if (data.status !== undefined) update.status = data.status;
 
   await supabase.from('jobs').update(update).eq('id', id);
+  await logAudit('update', 'job', id, update);
   return await getJob(id) || null;
 }
 
 export async function deleteJob(id: string) {
   await supabase.from('jobs').delete().eq('id', id);
+  await logAudit('delete', 'job', id);
 }
 
 export async function addExpense(jobId: string, expense: Omit<Expense, 'id' | 'jobId' | 'createdAt'>): Promise<Expense | null> {
+  const uid = await getUserId();
   const { data, error } = await supabase.from('job_expenses').insert({
     job_id: jobId,
     description: expense.description,
     category: expense.category,
     value: expense.value,
     photo_url: expense.photoUrl || null,
+    user_id: uid,
   }).select().single();
 
   if (error || !data) return null;
+  await logAudit('create', 'expense', data.id, { jobId, value: expense.value });
   return {
     id: data.id,
     jobId: data.job_id,
@@ -244,6 +283,7 @@ export async function addExpense(jobId: string, expense: Omit<Expense, 'id' | 'j
 
 export async function deleteExpense(jobId: string, expenseId: string) {
   await supabase.from('job_expenses').delete().eq('id', expenseId);
+  await logAudit('delete', 'expense', expenseId, { jobId });
 }
 
 // ---- Company Info ----
@@ -263,6 +303,7 @@ export async function getCompanyInfo(): Promise<CompanyInfo> {
 }
 
 export async function saveCompanyInfo(info: CompanyInfo) {
+  const uid = await getUserId();
   const { data: existing } = await supabase.from('company_info').select('id').limit(1).single();
   if (existing) {
     await supabase.from('company_info').update({
@@ -281,6 +322,7 @@ export async function saveCompanyInfo(info: CompanyInfo) {
       email: info.email,
       address: info.address,
       logo_url: info.logoUrl || null,
+      user_id: uid,
     });
   }
 }
