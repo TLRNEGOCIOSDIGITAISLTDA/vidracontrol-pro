@@ -97,14 +97,9 @@ const QuoteDetail = () => {
         // fallback below
       }
 
-      // Build WhatsApp message
-      let message: string;
-      if (pdfUrl) {
-        message = `Olá ${quote.clientName}! Segue o orçamento conforme solicitado: ${pdfUrl}\n\nQualquer dúvida estou à disposição!\nAtt, ${userName}`;
-      } else {
-        // Fallback: text-based quote
-        message = buildWhatsAppText(quote, userName);
-      }
+      // Build WhatsApp message with clean app URL
+      const appUrl = `${window.location.origin}/orcamento-publico/${id}`;
+      const message = `Olá ${quote.clientName}! Segue o orçamento conforme solicitado: ${appUrl}\n\nQualquer dúvida estou à disposição!\nAtt, ${userName}`;
 
       const encoded = encodeURIComponent(message);
       window.open(`https://wa.me/55${clientPhone}?text=${encoded}`, '_blank');
