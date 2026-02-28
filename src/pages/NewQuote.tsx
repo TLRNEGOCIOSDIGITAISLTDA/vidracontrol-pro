@@ -27,7 +27,16 @@ const NewQuote = () => {
   const [clientName, setClientName] = useState("");
   const [jobType, setJobType] = useState("");
   const [notes, setNotes] = useState("");
-  const [items, setItems] = useState<QuoteItem[]>([]);
+  const [items, setItems] = useState<QuoteItem[]>([
+    {
+      id: crypto.randomUUID(),
+      type: "vidro_comum",
+      description: QUOTE_ITEM_LABELS["vidro_comum"],
+      quantity: 1,
+      unitPrice: 0,
+      total: 0,
+    },
+  ]);
   const [showCompany, setShowCompany] = useState(false);
 
   const addItem = () => {
@@ -262,6 +271,12 @@ const NewQuote = () => {
                     </div>
                   </div>
 
+                  {item.width && item.height && (
+                    <div className="text-xs text-muted-foreground">
+                      Área: {(item.width * item.height * item.quantity).toFixed(2)} m²
+                    </div>
+                  )}
+
                   <div className="text-right text-sm font-bold text-primary">
                     Subtotal: {fmt(item.total)}
                   </div>
@@ -269,18 +284,24 @@ const NewQuote = () => {
               ))}
             </AnimatePresence>
 
-            {items.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Clique em "+ Item" para adicionar produtos ao orçamento.
-              </p>
-            )}
+            <Button type="button" variant="outline" className="w-full gap-1" onClick={addItem}>
+              <Plus className="h-4 w-4" /> Adicionar Item
+            </Button>
           </div>
 
-          {/* Total */}
+          {/* Summary footer */}
           {items.length > 0 && (
-            <div className="bg-primary/10 rounded-xl p-4 text-center">
-              <span className="text-sm text-muted-foreground">Total do Orçamento</span>
-              <div className="text-2xl font-bold text-primary">{fmt(total)}</div>
+            <div className="bg-primary/10 rounded-xl p-4 space-y-1">
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Total de m²</span>
+                <span className="font-bold text-foreground">
+                  {items.reduce((s, i) => s + ((i.width || 0) * (i.height || 0) * i.quantity), 0).toFixed(2)} m²
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Valor Total</span>
+                <span className="text-xl font-bold text-primary">{fmt(total)}</span>
+              </div>
             </div>
           )}
 
