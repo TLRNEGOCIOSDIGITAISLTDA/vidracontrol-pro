@@ -441,10 +441,10 @@ const AppDashboard = () => {
             variant="outline"
             size="sm"
             className="text-destructive border-destructive/30 hover:bg-destructive/10 gap-2"
-            onClick={() => {
+            onClick={async () => {
               if (confirm("Apagar TODOS os orçamentos, obras e custos? Os dados da empresa serão mantidos.")) {
-                clearAllData();
-                refreshAll();
+                await clearAllData();
+                await refreshAll();
                 toast.success("Dados limpos! Sistema zerado para novo teste.");
               }
             }}

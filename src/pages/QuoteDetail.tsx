@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { Trash2, Send, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
-import { getQuote, deleteQuote, getProfile } from "@/lib/storage";
+import { getQuote, getProfile } from "@/lib/storage";
 import { useData } from "@/lib/DataContext";
 import { Quote, QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from "@/lib/types";
 import { toast } from "sonner";
@@ -27,7 +27,7 @@ function getFlowIndex(status: QuoteStatus): number {
 const QuoteDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { changeQuoteStatus } = useData();
+  const { changeQuoteStatus, removeQuote } = useData();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [sending, setSending] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
@@ -50,7 +50,7 @@ const QuoteDetail = () => {
   const handleDelete = async () => {
     if (!id) return;
     if (confirm("Excluir este orçamento?")) {
-      await deleteQuote(id);
+      await removeQuote(id);
       toast.success("Orçamento excluído.");
       navigate("/app/orcamentos");
     }

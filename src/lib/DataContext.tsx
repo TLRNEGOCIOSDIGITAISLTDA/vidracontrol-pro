@@ -6,6 +6,8 @@ import {
   addJob as storageAddJob,
   addQuoteCost as storageSaveCost,
   deleteQuoteCost as storageDeleteCost,
+  deleteJob as storageDeleteJob,
+  deleteQuote as storageDeleteQuote,
   saveQuoteStatus,
 } from "./storage";
 
@@ -19,6 +21,8 @@ interface DataContextType {
   addCost: (quoteId: string, cost: Parameters<typeof storageSaveCost>[1]) => Promise<Awaited<ReturnType<typeof storageSaveCost>>>;
   removeCost: (quoteId: string, costId: string) => Promise<void>;
   changeQuoteStatus: (quoteId: string, newStatus: QuoteStatus) => Promise<void>;
+  removeJob: (jobId: string) => Promise<void>;
+  removeQuote: (quoteId: string) => Promise<void>;
   lastUpdate: number;
 }
 
@@ -99,8 +103,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await refreshQuotes();
   }, [quotes, refreshJobs, refreshQuotes]);
 
+  const removeJob = useCallback(async (jobId: string) => {
+    await storageDeleteJob(jobId);
+    await refreshAll();
+  }, [refreshAll]);
+
+  const removeQuote = useCallback(async (quoteId: string) => {
+    await storageDeleteQuote(quoteId);
+    await refreshAll();
+  }, [refreshAll]);
+
   return (
-    <DataContext.Provider value={{ jobs, quotes, loading, refreshAll, refreshQuotes, refreshJobs, addCost, removeCost, changeQuoteStatus, lastUpdate }}>
+    <DataContext.Provider value={{ jobs, quotes, loading, refreshAll, refreshQuotes, refreshJobs, addCost, removeCost, changeQuoteStatus, removeJob, removeQuote, lastUpdate }}>
       {children}
     </DataContext.Provider>
   );

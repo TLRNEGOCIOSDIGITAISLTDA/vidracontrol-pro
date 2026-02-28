@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import AppHeader from "@/components/app/AppHeader";
-import { getJob, addExpense, deleteExpense, updateJob, deleteJob } from "@/lib/storage";
+import { getJob, addExpense, deleteExpense, updateJob } from "@/lib/storage";
+import { useData } from "@/lib/DataContext";
 import { Job, ExpenseCategory, CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/types";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -83,9 +84,11 @@ const JobDetail = () => {
     await reload();
   };
 
+  const { removeJob } = useData();
+
   const handleDelete = async () => {
     if (confirm("Tem certeza que deseja excluir esta obra?")) {
-      await deleteJob(job.id);
+      await removeJob(job.id);
       navigate(backTo);
       toast.success("Obra excluída.");
     }
