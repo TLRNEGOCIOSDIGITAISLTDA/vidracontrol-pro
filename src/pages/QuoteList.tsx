@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 const ALL_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'fechado', 'perdido'];
+const ACTIVE_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'perdido'];
 
 const QuoteList = () => {
   const [quotes, setQuotes] = useState<Quote[]>([]);
@@ -103,16 +104,22 @@ const QuoteList = () => {
           </div>
         )}
 
-        {/* Quote list grouped by status */}
-        {quotes.length === 0 ? (
+        {/* Quote list grouped by status (excluding fechado) */}
+        {(() => {
+          const activeByStatus = ACTIVE_STATUSES.map((status) => {
+            const filtered = quotes.filter((q) => (q.status || "orcado") === status);
+            return { status, label: QUOTE_STATUS_LABELS[status], color: QUOTE_STATUS_COLORS[status], count: filtered.length, total: filtered.reduce((s, q) => s + q.total, 0), quotes: filtered };
+          });
+          const activeQuotes = quotes.filter(q => (q.status || 'orcado') !== 'fechado');
+          return activeQuotes.length === 0 ? (
           <div className="text-center py-16">
             <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
-            <p className="text-muted-foreground">Nenhum orçamento ainda.</p>
-            <p className="text-muted-foreground text-sm">Crie seu primeiro orçamento!</p>
+            <p className="text-muted-foreground">Nenhum orçamento ativo.</p>
+            <p className="text-muted-foreground text-sm">Orçamentos fechados viram Obras automaticamente.</p>
           </div>
         ) : (
           <div className="space-y-5">
-            {quotesByStatus.filter(g => g.count > 0).map((group) => (
+            {activeByStatus.filter(g => g.count > 0).map((group) => (
               <div key={group.status}>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.color }} />
@@ -145,7 +152,8 @@ const QuoteList = () => {
               </div>
             ))}
           </div>
-        )}
+        );
+        })()}
       </div>
     </div>
   );

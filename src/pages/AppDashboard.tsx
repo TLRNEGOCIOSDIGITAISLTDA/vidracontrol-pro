@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 const ALL_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'fechado', 'perdido'];
+const ACTIVE_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'perdido'];
 
 const HighlightCard = ({ children, className = "", lastUpdate }: { children: React.ReactNode; className?: string; lastUpdate: number }) => {
   const [flash, setFlash] = useState(false);
@@ -59,6 +60,20 @@ const AppDashboard = () => {
 
   const qtyData = quotesByStatus.filter(d => d.count > 0).map(d => ({ name: d.label, value: d.count, color: d.color }));
   const valueData = quotesByStatus.filter(d => d.total > 0).map(d => ({ name: d.label, value: d.total, color: d.color }));
+
+  // Active quotes (excluding fechado) for the Orçamentos accordion
+  const activeByStatus = ACTIVE_STATUSES.map((status) => {
+    const filtered = quotes.filter((q) => (q.status || "orcado") === status);
+    return {
+      status,
+      label: QUOTE_STATUS_LABELS[status],
+      color: QUOTE_STATUS_COLORS[status],
+      count: filtered.length,
+      total: filtered.reduce((s, q) => s + q.total, 0),
+      quotes: filtered,
+    };
+  });
+  const activeQuotes = quotes.filter(q => (q.status || 'orcado') !== 'fechado');
 
   const hasQuotes = quotes.length > 0;
   const [quotesOpen, setQuotesOpen] = useState(false);
@@ -161,15 +176,15 @@ const AppDashboard = () => {
               </Button>
             </div>
           </div>
-          <div className="overflow-hidden transition-all duration-300 ease-out" style={{ maxHeight: quotesOpen ? `${quotes.length * 120 + quotesByStatus.length * 60 + 200}px` : "0px", opacity: quotesOpen ? 1 : 0 }}>
+          <div className="overflow-hidden transition-all duration-300 ease-out" style={{ maxHeight: quotesOpen ? `${activeQuotes.length * 120 + activeByStatus.length * 60 + 200}px` : "0px", opacity: quotesOpen ? 1 : 0 }}>
             <div className="pt-3 space-y-4">
-              {quotes.length === 0 ? (
+              {activeQuotes.length === 0 ? (
                 <div className="text-center py-10">
                   <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
-                  <p className="text-muted-foreground">Nenhum orçamento ainda.</p>
+                  <p className="text-muted-foreground">Nenhum orçamento ativo.</p>
                 </div>
               ) : (
-                quotesByStatus.filter(g => g.count > 0).map((group) => (
+                activeByStatus.filter(g => g.count > 0).map((group) => (
                   <div key={group.status}>
                     <div className="flex items-center gap-2 mb-2">
                       <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.color }} />

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from "react";
-import { Job, Quote } from "./types";
-import { getJobs, getQuotes, saveQuotes, addQuoteCost as storageSaveCost, deleteQuoteCost as storageDeleteCost } from "./storage";
+import { Job, Quote, QuoteStatus, JobItem } from "./types";
+import { getJobs, getQuotes, saveQuotes, addJob as storageAddJob, addQuoteCost as storageSaveCost, deleteQuoteCost as storageDeleteCost } from "./storage";
 
 interface DataContextType {
   jobs: Job[];
@@ -10,7 +10,7 @@ interface DataContextType {
   refreshJobs: () => void;
   addCost: (quoteId: string, cost: Parameters<typeof storageSaveCost>[1]) => ReturnType<typeof storageSaveCost>;
   removeCost: (quoteId: string, costId: string) => void;
-  /** Tracks the last update timestamp so consumers can react */
+  changeQuoteStatus: (quoteId: string, newStatus: QuoteStatus) => void;
   lastUpdate: number;
 }
 
@@ -38,8 +38,46 @@ export function DataProvider({ children }: { children: ReactNode }) {
     refreshQuotes();
   }, [refreshQuotes]);
 
+  const changeQuoteStatus = useCallback((quoteId: string, newStatus: QuoteStatus) => {
+    const allQuotes = getQuotes();
+    const idx = allQuotes.findIndex(q => q.id === quoteId);
+    if (idx === -1) return;
+
+    const quote = allQuotes[idx];
+    const prevStatus = quote.status || 'orcado';
+    allQuotes[idx] = { ...quote, status: newStatus };
+    saveQuotes(allQuotes);
+
+    // When moving to "fechado", auto-create a Job from the quote
+    if (newStatus === 'fechado' && prevStatus !== 'fechado') {
+      const jobItems: JobItem[] = quote.items.map(item => ({
+        id: crypto.randomUUID(),
+        type: item.type,
+        description: item.description,
+        width: item.width ? item.width * 1000 : undefined,
+        height: item.height ? item.height * 1000 : undefined,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        total: item.total,
+        area: item.width && item.height ? item.width * item.height * item.quantity : undefined,
+      }));
+
+      storageAddJob({
+        clientName: quote.clientName,
+        description: `Orçamento aprovado — ${quote.jobType || 'Vidraçaria'}`,
+        saleValue: quote.total,
+        status: 'em_andamento',
+        items: jobItems,
+      });
+
+      refreshJobs();
+    }
+
+    refreshQuotes();
+  }, [refreshJobs, refreshQuotes]);
+
   return (
-    <DataContext.Provider value={{ jobs, quotes, refreshAll, refreshQuotes, refreshJobs, addCost, removeCost, lastUpdate }}>
+    <DataContext.Provider value={{ jobs, quotes, refreshAll, refreshQuotes, refreshJobs, addCost, removeCost, changeQuoteStatus, lastUpdate }}>
       {children}
     </DataContext.Provider>
   );
