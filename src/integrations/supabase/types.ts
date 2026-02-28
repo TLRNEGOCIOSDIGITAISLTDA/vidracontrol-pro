@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          ip_address: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          ip_address?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          ip_address?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       company_info: {
         Row: {
           address: string
@@ -25,6 +58,7 @@ export type Database = {
           name: string
           phone: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           address?: string
@@ -36,6 +70,7 @@ export type Database = {
           name?: string
           phone?: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           address?: string
@@ -47,6 +82,7 @@ export type Database = {
           name?: string
           phone?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -58,6 +94,7 @@ export type Database = {
           id: string
           job_id: string
           photo_url: string | null
+          user_id: string | null
           value: number
         }
         Insert: {
@@ -67,6 +104,7 @@ export type Database = {
           id?: string
           job_id: string
           photo_url?: string | null
+          user_id?: string | null
           value?: number
         }
         Update: {
@@ -76,6 +114,7 @@ export type Database = {
           id?: string
           job_id?: string
           photo_url?: string | null
+          user_id?: string | null
           value?: number
         }
         Relationships: [
@@ -100,6 +139,7 @@ export type Database = {
           total: number
           type: string
           unit_price: number
+          user_id: string | null
           width: number | null
         }
         Insert: {
@@ -113,6 +153,7 @@ export type Database = {
           total?: number
           type?: string
           unit_price?: number
+          user_id?: string | null
           width?: number | null
         }
         Update: {
@@ -126,6 +167,7 @@ export type Database = {
           total?: number
           type?: string
           unit_price?: number
+          user_id?: string | null
           width?: number | null
         }
         Relationships: [
@@ -146,6 +188,7 @@ export type Database = {
           id: string
           sale_value: number
           status: string
+          user_id: string | null
         }
         Insert: {
           client_name: string
@@ -154,6 +197,7 @@ export type Database = {
           id?: string
           sale_value?: number
           status?: string
+          user_id?: string | null
         }
         Update: {
           client_name?: string
@@ -162,6 +206,7 @@ export type Database = {
           id?: string
           sale_value?: number
           status?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -173,6 +218,7 @@ export type Database = {
           description: string
           id: string
           quote_id: string
+          user_id: string | null
           value: number
         }
         Insert: {
@@ -182,6 +228,7 @@ export type Database = {
           description: string
           id?: string
           quote_id: string
+          user_id?: string | null
           value?: number
         }
         Update: {
@@ -191,6 +238,7 @@ export type Database = {
           description?: string
           id?: string
           quote_id?: string
+          user_id?: string | null
           value?: number
         }
         Relationships: [
@@ -215,6 +263,7 @@ export type Database = {
           total: number
           type: string
           unit_price: number
+          user_id: string | null
           width: number | null
         }
         Insert: {
@@ -228,6 +277,7 @@ export type Database = {
           total?: number
           type?: string
           unit_price?: number
+          user_id?: string | null
           width?: number | null
         }
         Update: {
@@ -241,6 +291,7 @@ export type Database = {
           total?: number
           type?: string
           unit_price?: number
+          user_id?: string | null
           width?: number | null
         }
         Relationships: [
@@ -263,6 +314,7 @@ export type Database = {
           notes: string | null
           status: string
           total: number
+          user_id: string | null
         }
         Insert: {
           client_name: string
@@ -273,6 +325,7 @@ export type Database = {
           notes?: string | null
           status?: string
           total?: number
+          user_id?: string | null
         }
         Update: {
           client_name?: string
@@ -283,6 +336,7 @@ export type Database = {
           notes?: string | null
           status?: string
           total?: number
+          user_id?: string | null
         }
         Relationships: []
       }
