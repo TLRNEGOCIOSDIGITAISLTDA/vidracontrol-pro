@@ -262,8 +262,10 @@ const QuoteList = () => {
     };
   });
 
-  const qtyData = quotesByStatus.filter((d) => d.count > 0).map((d) => ({ name: d.label, value: d.count, color: d.color }));
-  const valueData = quotesByStatus.filter((d) => d.total > 0).map((d) => ({ name: d.label, value: d.total, color: d.color }));
+  const CHART_STATUSES: QuoteStatus[] = ["orcado", "aguardando", "aprovado", "perdido"];
+  const chartByStatus = quotesByStatus.filter((d) => CHART_STATUSES.includes(d.status));
+  const qtyData = chartByStatus.filter((d) => d.count > 0).map((d) => ({ name: d.label, value: d.count, color: d.color }));
+  const valueData = chartByStatus.filter((d) => d.total > 0).map((d) => ({ name: d.label, value: d.total, color: d.color }));
   const hasData = quotes.length > 0;
   const renderLabel = ({ percent }: { percent: number }) =>
     percent > 0 ? `${(percent * 100).toFixed(0)}%` : "";
@@ -319,14 +321,14 @@ const QuoteList = () => {
               <h3 className="text-xs font-bold text-muted-foreground text-center mb-2 uppercase tracking-wide">
                 Quantidade
               </h3>
-              <div className="h-40">
+              <div className="h-52">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={qtyData}
                       cx="50%"
                       cy="50%"
-                      outerRadius={55}
+                      outerRadius={68}
                       dataKey="value"
                       label={renderLabel}
                       labelLine={false}
@@ -341,7 +343,7 @@ const QuoteList = () => {
                 </ResponsiveContainer>
               </div>
               <div className="flex flex-wrap justify-center gap-2 mt-2">
-                {quotesByStatus.map((d) => (
+                {chartByStatus.map((d) => (
                   <div key={d.status} className="flex items-center gap-1 text-[10px]">
                     <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
                     <span className="text-muted-foreground">
@@ -356,14 +358,14 @@ const QuoteList = () => {
               <h3 className="text-xs font-bold text-muted-foreground text-center mb-2 uppercase tracking-wide">
                 Valores (R$)
               </h3>
-              <div className="h-40">
+              <div className="h-52">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={valueData}
                       cx="50%"
                       cy="50%"
-                      outerRadius={55}
+                      outerRadius={68}
                       dataKey="value"
                       label={renderLabel}
                       labelLine={false}
@@ -378,7 +380,7 @@ const QuoteList = () => {
                 </ResponsiveContainer>
               </div>
               <div className="flex flex-wrap justify-center gap-2 mt-2">
-                {quotesByStatus.map((d) => (
+                {chartByStatus.map((d) => (
                   <div key={d.status} className="flex items-center gap-1 text-[10px]">
                     <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
                     <span className="text-muted-foreground">

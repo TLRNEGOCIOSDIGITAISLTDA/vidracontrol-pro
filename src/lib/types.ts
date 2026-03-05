@@ -100,8 +100,8 @@ export type QuoteStatus = 'orcado' | 'enviado' | 'aguardando' | 'aprovado' | 'pe
 export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
   orcado: 'Orçado',
   enviado: 'Enviado',
-  aguardando: 'Aguardando Aprovação',
-  aprovado: 'Aprovado pelo Cliente',
+  aguardando: 'Aguardando',
+  aprovado: 'Aprovado',
   perdido: 'Perdido',
 };
 
