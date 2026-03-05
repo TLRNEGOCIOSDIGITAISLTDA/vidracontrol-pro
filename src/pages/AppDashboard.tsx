@@ -41,10 +41,10 @@ const AppDashboard = () => {
 
   useEffect(() => { refreshAll(); }, [refreshAll]);
 
-  // Sales/Costs/Profit from approved quotes
+  // Sales/Costs/Profit from jobs (expenses registered inside each job)
   const closedQuotes = quotes.filter(q => q.status === "aprovado");
-  const totalSales = closedQuotes.reduce((s, q) => s + q.total, 0);
-  const totalCosts = closedQuotes.reduce((s, q) => s + (q.costs || []).reduce((cs, c) => cs + c.value, 0), 0);
+  const totalSales = jobs.reduce((s, j) => s + j.saleValue, 0);
+  const totalCosts = jobs.reduce((s, j) => s + j.expenses.reduce((es, e) => es + e.value, 0), 0);
   const totalProfit = totalSales - totalCosts;
   const avgMargin = totalSales > 0 ? ((totalProfit / totalSales) * 100) : 0;
 
@@ -86,23 +86,23 @@ const AppDashboard = () => {
   const [jobsOpen, setJobsOpen] = useState(false);
   const [monthlyOpen, setMonthlyOpen] = useState(false);
 
-  // Monthly breakdown from closed quotes
+  // Monthly breakdown from jobs (uses real expenses per job)
   const monthlyData = useMemo(() => {
     const map = new Map<string, { key: string; month: string; sales: number; costs: number; count: number }>();
-    closedQuotes.forEach(q => {
-      const d = new Date(q.createdAt);
+    jobs.forEach(j => {
+      const d = new Date(j.createdAt);
       const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
       const label = `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
       if (!map.has(key)) map.set(key, { key, month: label, sales: 0, costs: 0, count: 0 });
       const entry = map.get(key)!;
-      entry.sales += q.total;
-      entry.costs += (q.costs || []).reduce((s, c) => s + c.value, 0);
+      entry.sales += j.saleValue;
+      entry.costs += j.expenses.reduce((s, e) => s + e.value, 0);
       entry.count += 1;
     });
     return Array.from(map.values())
       .sort((a, b) => b.key.localeCompare(a.key))
       .map(e => ({ ...e, profit: e.sales - e.costs, margin: e.sales > 0 ? ((e.sales - e.costs) / e.sales) * 100 : 0 }));
-  }, [closedQuotes]);
+  }, [jobs]);
 
   const renderLabel = ({ percent }: { percent: number }) =>
     percent > 0 ? `${(percent * 100).toFixed(0)}%` : "";
@@ -139,7 +139,7 @@ const AppDashboard = () => {
         </div>
 
         {/* Monthly Breakdown Accordion */}
-        {closedQuotes.length > 0 && (
+        {jobs.length > 0 && (
           <div>
             <Button
               variant="outline"
@@ -290,13 +290,13 @@ const AppDashboard = () => {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-foreground">Orçamentos</h2>
             <div className="flex items-center gap-2">
-              <Link to="/app/novo-orcamento">
-                <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Orçamento</Button>
-              </Link>
               <Button size="sm" variant="outline" onClick={() => setQuotesOpen(!quotesOpen)} className="gap-1">
                 Ver todos
                 <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${quotesOpen ? "rotate-180" : ""}`} />
               </Button>
+              <Link to="/app/novo-orcamento">
+                <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Orçamento</Button>
+              </Link>
             </div>
           </div>
           <div className="overflow-hidden transition-all duration-300 ease-out" style={{ maxHeight: quotesOpen ? `${activeQuotes.length * 120 + activeByStatus.length * 60 + 200}px` : "0px", opacity: quotesOpen ? 1 : 0 }}>
@@ -343,13 +343,13 @@ const AppDashboard = () => {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-foreground">Minhas Obras</h2>
             <div className="flex items-center gap-2">
-              <Link to="/app/nova-obra">
-                <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Nova Obra</Button>
-              </Link>
               <Button size="sm" variant="outline" onClick={() => setJobsOpen(!jobsOpen)} className="gap-1">
                 Ver todos
                 <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${jobsOpen ? "rotate-180" : ""}`} />
               </Button>
+              <Link to="/app/nova-obra">
+                <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Nova Obra</Button>
+              </Link>
             </div>
           </div>
           <div className="overflow-hidden transition-all duration-300 ease-out" style={{ maxHeight: jobsOpen ? `${jobs.length * 140 + 100}px` : "0px", opacity: jobsOpen ? 1 : 0 }}>
