@@ -81,12 +81,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         id: crypto.randomUUID(),
         type: item.type,
         description: item.description,
-        width: item.width ? item.width * 1000 : undefined,
-        height: item.height ? item.height * 1000 : undefined,
+        width: item.width,
+        height: item.height,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         total: item.total,
-        area: item.width && item.height ? item.width * item.height * item.quantity : undefined,
+        area: item.width && item.height ? item.width * item.height / 1_000_000 * item.quantity : undefined,
       }));
 
       await storageAddJob({

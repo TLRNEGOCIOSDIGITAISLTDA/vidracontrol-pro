@@ -55,7 +55,7 @@ export function generateQuotePdf(quote: Quote, userWhatsapp?: string): jsPDF {
   // Items table
   const tableBody = quote.items.map((item, i) => {
     const dims = item.width && item.height
-      ? `${item.width}m × ${item.height}m (${(item.width * item.height).toFixed(2)}m²)`
+      ? `${item.width}mm × ${item.height}mm (${(item.width * item.height / 1_000_000).toFixed(4)}m²)`
       : '';
     const desc = item.location
       ? `${item.description}\n${dims}\n📍 ${item.location}`

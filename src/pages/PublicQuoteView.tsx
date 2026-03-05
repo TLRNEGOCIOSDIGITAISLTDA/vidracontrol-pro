@@ -176,9 +176,9 @@ const PublicQuoteView = () => {
                         <div className="font-bold">{item.description}</div>
                         {(item.width || item.height) && (
                           <div className="text-xs text-[hsl(215,10%,45%)]">
-                            {item.width ? `${item.width}m` : '—'} × {item.height ? `${item.height}m` : '—'}
+                            {item.width ? `${item.width}mm` : '—'} × {item.height ? `${item.height}mm` : '—'}
                             {item.width && item.height && (
-                              <span className="ml-1">({(item.width * item.height).toFixed(2)}m²)</span>
+                              <span className="ml-1">({(item.width * item.height / 1_000_000).toFixed(4)}m²)</span>
                             )}
                           </div>
                         )}
