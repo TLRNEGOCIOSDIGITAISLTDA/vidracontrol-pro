@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, FileText, LayoutGrid, List, CheckCircle2, XCircle, Clock, Send } from "lucide-react";
+import { Plus, FileText, LayoutGrid, List, CheckCircle2, XCircle, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { useData } from "@/lib/DataContext";
@@ -54,9 +54,8 @@ function KanbanCard({
     : undefined;
 
   const showWA = status === "orcado";
-  const showAguardando = status === "enviado";
   const showAprovar = status === "enviado" || status === "aguardando";
-  const showPerdido = status === "orcado" || status === "enviado" || status === "aguardando";
+  const showPerdido = status === "enviado" || status === "aguardando";
 
   return (
     <div
@@ -88,7 +87,7 @@ function KanbanCard({
       </Link>
 
       {/* Quick actions */}
-      {(showWA || showAguardando || showAprovar || showPerdido) && (
+      {(showWA || showAprovar || showPerdido) && (
         <div className="flex gap-1 px-2 pb-2.5 flex-wrap border-t border-border/40 pt-1.5">
           {showWA && (
             <button
@@ -101,18 +100,6 @@ function KanbanCard({
               className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md bg-[hsl(215,80%,55%)]/10 text-[hsl(215,80%,45%)] hover:bg-[hsl(215,80%,55%)]/20 transition-colors"
             >
               <Send className="h-2.5 w-2.5" /> Enviar WA
-            </button>
-          )}
-          {showAguardando && (
-            <button
-              onClick={async (e) => {
-                e.preventDefault();
-                await onStatusChange(quote.id, "aguardando");
-                toast.success("Status: Aguardando Aprovação");
-              }}
-              className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md bg-[hsl(25,90%,55%)]/10 text-[hsl(25,90%,45%)] hover:bg-[hsl(25,90%,55%)]/20 transition-colors"
-            >
-              <Clock className="h-2.5 w-2.5" /> Aguardar
             </button>
           )}
           {showAprovar && (
@@ -454,13 +441,9 @@ const QuoteList = () => {
               .filter((g) => g.count > 0)
               .map((group) => {
                 const showWA = group.status === "orcado";
-                const showAguardando = group.status === "enviado";
                 const showAprovar = group.status === "enviado" || group.status === "aguardando";
-                const showPerdido =
-                  group.status === "orcado" ||
-                  group.status === "enviado" ||
-                  group.status === "aguardando";
-                const showActions = showWA || showAguardando || showAprovar || showPerdido;
+                const showPerdido = group.status === "enviado" || group.status === "aguardando";
+                const showActions = showWA || showAprovar || showPerdido;
 
                 return (
                   <div key={group.status}>
@@ -518,18 +501,6 @@ const QuoteList = () => {
                                     className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-[hsl(215,80%,55%)]/10 text-[hsl(215,80%,45%)] hover:bg-[hsl(215,80%,55%)]/20 transition-colors"
                                   >
                                     <Send className="h-3 w-3" /> Enviar WA
-                                  </button>
-                                )}
-                                {showAguardando && (
-                                  <button
-                                    onClick={async (e) => {
-                                      e.preventDefault();
-                                      await handleStatusChange(q.id, "aguardando");
-                                      toast.success("Status: Aguardando Aprovação");
-                                    }}
-                                    className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-[hsl(25,90%,55%)]/10 text-[hsl(25,90%,45%)] hover:bg-[hsl(25,90%,55%)]/20 transition-colors"
-                                  >
-                                    <Clock className="h-3 w-3" /> Aguardando
                                   </button>
                                 )}
                                 {showAprovar && (

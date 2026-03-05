@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
-import { Trash2, Send, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Trash2, Send, CheckCircle2, XCircle, Loader2, Circle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { getQuote, getProfile } from "@/lib/storage";
@@ -149,17 +149,20 @@ const QuoteDetail = () => {
               const isCurrent = !isPerdido && flowIndex === i;
               return (
                 <div key={step.status} className="flex items-center gap-1.5 flex-shrink-0">
-                  <div className={`flex flex-col items-center gap-1 rounded-xl px-3 py-2.5 min-w-[68px] text-center border transition-colors ${
+                  <div className={`flex flex-col items-center gap-1.5 rounded-xl px-3 py-2.5 min-w-[68px] text-center border transition-colors ${
                     isCurrent
                       ? 'bg-primary text-primary-foreground border-primary shadow-sm'
                       : isDone
                         ? 'bg-success/10 text-success border-success/40'
                         : 'bg-muted/50 text-muted-foreground border-border'
                   }`}>
-                    <span className="text-base leading-none">
-                      {isDone ? '✅' : isCurrent ? '🔵' : '⬜'}
-                    </span>
-                    <span className="text-[10px] font-bold leading-tight mt-0.5">{step.label}</span>
+                    {isDone
+                      ? <CheckCircle2 className="h-4 w-4 mx-auto" />
+                      : isCurrent
+                        ? <div className="w-4 h-4 rounded-full bg-current mx-auto" style={{ opacity: 0.9 }} />
+                        : <Circle className="h-4 w-4 mx-auto opacity-30" />
+                    }
+                    <span className="text-[10px] font-bold leading-tight">{step.label}</span>
                   </div>
                   {i < FLOW_STEPS.length - 1 && (
                     <div className={`w-3 h-0.5 flex-shrink-0 rounded ${isDone ? 'bg-success' : 'bg-border'}`} />
@@ -168,13 +171,16 @@ const QuoteDetail = () => {
               );
             })}
             <div className="w-3 h-0.5 flex-shrink-0 rounded bg-border" />
-            <div className={`flex flex-col items-center gap-1 rounded-xl px-3 py-2.5 min-w-[68px] text-center border flex-shrink-0 transition-colors ${
+            <div className={`flex flex-col items-center gap-1.5 rounded-xl px-3 py-2.5 min-w-[68px] text-center border flex-shrink-0 transition-colors ${
               isPerdido
                 ? 'bg-destructive text-white border-destructive shadow-sm'
                 : 'bg-muted/50 text-muted-foreground border-border'
             }`}>
-              <span className="text-base leading-none">{isPerdido ? '❌' : '⬜'}</span>
-              <span className="text-[10px] font-bold leading-tight mt-0.5">Perdido</span>
+              {isPerdido
+                ? <XCircle className="h-4 w-4 mx-auto" />
+                : <Circle className="h-4 w-4 mx-auto opacity-30" />
+              }
+              <span className="text-[10px] font-bold leading-tight">Perdido</span>
             </div>
           </div>
         </div>
