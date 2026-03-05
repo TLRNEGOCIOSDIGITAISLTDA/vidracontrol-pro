@@ -118,8 +118,8 @@ const QuoteDetail = () => {
   const handleApprove = async () => {
     if (!quote || !id) return;
     await changeQuoteStatus(id, 'aprovado');
+    setQuote({ ...quote, status: 'aprovado' });
     toast.success("Orçamento aprovado! Obra criada automaticamente em Minhas Obras. 🎉");
-    navigate("/app");
   };
 
   const handleLost = async () => {

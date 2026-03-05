@@ -67,8 +67,8 @@ const AppDashboard = () => {
   const qtyData = quotesByStatus.filter(d => d.count > 0).map(d => ({ name: d.label, value: d.count, color: d.color }));
   const valueData = quotesByStatus.filter(d => d.total > 0).map(d => ({ name: d.label, value: d.total, color: d.color }));
 
-  // Active quotes (excluding fechado) for the Orçamentos accordion
-  const activeByStatus = ACTIVE_STATUSES.map((status) => {
+  // All quotes grouped by status for the Orçamentos accordion
+  const activeByStatus = ALL_STATUSES.map((status) => {
     const filtered = quotes.filter((q) => (q.status || "orcado") === status);
     return {
       status,
@@ -79,7 +79,6 @@ const AppDashboard = () => {
       quotes: filtered,
     };
   });
-  const activeQuotes = quotes.filter(q => (q.status || 'orcado') !== 'aprovado');
 
   const hasQuotes = quotes.length > 0;
   const [quotesOpen, setQuotesOpen] = useState(false);
@@ -299,12 +298,12 @@ const AppDashboard = () => {
               </Link>
             </div>
           </div>
-          <div className="overflow-hidden transition-all duration-300 ease-out" style={{ maxHeight: quotesOpen ? `${activeQuotes.length * 120 + activeByStatus.length * 60 + 200}px` : "0px", opacity: quotesOpen ? 1 : 0 }}>
+          <div className="overflow-hidden transition-all duration-300 ease-out" style={{ maxHeight: quotesOpen ? `${quotes.length * 120 + activeByStatus.length * 60 + 200}px` : "0px", opacity: quotesOpen ? 1 : 0 }}>
             <div className="pt-3 space-y-4">
-              {activeQuotes.length === 0 ? (
+              {quotes.length === 0 ? (
                 <div className="text-center py-10">
                   <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
-                  <p className="text-muted-foreground">Nenhum orçamento ativo.</p>
+                  <p className="text-muted-foreground">Nenhum orçamento ainda.</p>
                 </div>
               ) : (
                 activeByStatus.filter(g => g.count > 0).map((group) => (
