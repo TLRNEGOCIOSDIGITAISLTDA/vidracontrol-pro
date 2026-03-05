@@ -10,6 +10,7 @@ import {
   deleteQuote as storageDeleteQuote,
   saveQuoteStatus,
 } from "./storage";
+import { supabase } from "@/integrations/supabase/client";
 
 interface DataContextType {
   jobs: Job[];
@@ -68,14 +69,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [refreshQuotes]);
 
   const changeQuoteStatus = useCallback(async (quoteId: string, newStatus: QuoteStatus) => {
-    // Find current quote
+    // Find current quote in local state (for item data)
     const quote = quotes.find(q => q.id === quoteId);
     if (!quote) return;
 
-    const prevStatus = quote.status || 'orcado';
+    // Read current status DIRECTLY from DB to avoid stale state causing duplicate job creation
+    const { data: dbRow } = await supabase.from('quotes').select('status').eq('id', quoteId).single();
+    const prevStatus = (dbRow?.status as QuoteStatus) || 'orcado';
+
     await saveQuoteStatus(quoteId, newStatus);
 
-    // When moving to "aprovado", auto-create a Job from the quote
+    // When moving to "aprovado", auto-create a Job — only if not already aprovado in DB
     if (newStatus === 'aprovado' && prevStatus !== 'aprovado') {
       const jobItems: JobItem[] = quote.items.map(item => ({
         id: crypto.randomUUID(),
@@ -101,7 +105,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
 
     await refreshQuotes();
-  }, [quotes, refreshJobs, refreshQuotes]);
+  }, [quotes, refreshJobs, refreshQuotes]); // `quotes` still needed to get item data for job creation
 
   const removeJob = useCallback(async (jobId: string) => {
     await storageDeleteJob(jobId);
