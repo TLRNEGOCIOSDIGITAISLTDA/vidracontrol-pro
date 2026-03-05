@@ -8,29 +8,23 @@ export interface Expense {
   createdAt: string;
 }
 
-export type ExpenseCategory = 
+export type ExpenseCategory =
   | 'material'
+  | 'mao_de_obra'
   | 'transporte'
-  | 'alimentacao'
-  | 'ferramenta'
-  | 'ajudante'
   | 'outros';
 
 export const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   material: 'Material',
+  mao_de_obra: 'Mão de obra',
   transporte: 'Transporte',
-  alimentacao: 'Alimentação',
-  ferramenta: 'Ferramenta',
-  ajudante: 'Ajudante',
   outros: 'Outros',
 };
 
 export const CATEGORY_COLORS: Record<ExpenseCategory, string> = {
   material: 'hsl(215, 80%, 45%)',
+  mao_de_obra: 'hsl(280, 60%, 50%)',
   transporte: 'hsl(35, 95%, 55%)',
-  alimentacao: 'hsl(145, 60%, 42%)',
-  ferramenta: 'hsl(280, 60%, 50%)',
-  ajudante: 'hsl(170, 60%, 40%)',
   outros: 'hsl(0, 0%, 50%)',
 };
 
