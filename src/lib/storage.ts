@@ -43,12 +43,15 @@ export async function getQuotes(): Promise<Quote[]> {
     clientPhone: (r as any).client_phone || '',
     jobType: r.job_type || '',
     total: Number(r.total),
-    companyInfo: (r.company_info as unknown as CompanyInfo) || { name: '', cnpjCpf: '', phone: '', email: '', address: '' },
+    companyInfo: (() => {
+      const ci = (r.company_info as any) || {};
+      return { name: ci.name || '', cnpjCpf: ci.cnpjCpf || '', phone: ci.phone || '', email: ci.email || '', address: ci.address || '', logoUrl: ci.logoUrl };
+    })(),
     createdAt: r.created_at,
     notes: r.notes || undefined,
     status: (r.status as any) || 'orcado',
-    commission: (r as any).commission_pct ? Number((r as any).commission_pct) : undefined,
-    nfPercent: (r as any).nf_pct ? Number((r as any).nf_pct) : undefined,
+    commission: (r.company_info as any)?._commission ? Number((r.company_info as any)._commission) : undefined,
+    nfPercent: (r.company_info as any)?._nfPct ? Number((r.company_info as any)._nfPct) : undefined,
     items: (items || []).filter(i => i.quote_id === r.id).map(i => ({
       id: i.id,
       type: i.type as any,
@@ -86,9 +89,11 @@ export async function addQuote(quote: Omit<Quote, 'id' | 'createdAt'>): Promise<
     total: quote.total,
     notes: quote.notes || null,
     status: quote.status || 'orcado',
-    company_info: quote.companyInfo as any,
-    commission_pct: quote.commission || 0,
-    nf_pct: quote.nfPercent || 0,
+    company_info: {
+      ...quote.companyInfo,
+      ...(quote.commission ? { _commission: quote.commission } : {}),
+      ...(quote.nfPercent ? { _nfPct: quote.nfPercent } : {}),
+    } as any,
     user_id: uid,
   } as any).select().single();
 
