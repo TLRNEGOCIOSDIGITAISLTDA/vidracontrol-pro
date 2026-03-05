@@ -1,17 +1,17 @@
-import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Plus, FileText } from "lucide-react";
+import { Plus, FileText, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { useData } from "@/lib/DataContext";
-import { Quote, QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS, QUOTE_STATUS_BG } from "@/lib/types";
+import { QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS, QUOTE_STATUS_BG } from "@/lib/types";
 import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { toast } from "sonner";
 
 const ALL_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'aprovado', 'perdido'];
 
 const QuoteList = () => {
-  const { quotes } = useData();
+  const { quotes, changeQuoteStatus } = useData();
 
   const fmt = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -120,27 +120,56 @@ const QuoteList = () => {
                   <span className="text-xs text-muted-foreground">— {fmt(group.total)}</span>
                 </div>
                 <div className="space-y-2">
-                  {group.quotes.map((q, i) => (
-                    <motion.div key={q.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
-                      <Link to={`/app/orcamento/${q.id}`}>
-                        <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow">
-                          <div className="flex items-center justify-between mb-1">
-                            <h3 className="font-bold text-foreground truncate">{q.clientName}</h3>
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${QUOTE_STATUS_BG[group.status]}`}>
-                              {group.label}
-                            </span>
-                          </div>
-                          {q.jobType && <p className="text-sm text-muted-foreground mb-2">{q.jobType}</p>}
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(q.createdAt).toLocaleDateString("pt-BR")} · {q.items.length} {q.items.length === 1 ? "item" : "itens"}
-                            </span>
-                            <span className="font-bold text-primary">{fmt(q.total)}</span>
-                          </div>
+                  {group.quotes.map((q, i) => {
+                    const showActions = group.status === 'enviado' || group.status === 'aguardando';
+                    return (
+                      <motion.div key={q.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
+                        <div className="bg-card rounded-xl shadow-card hover:shadow-elevated transition-shadow">
+                          <Link to={`/app/orcamento/${q.id}`}>
+                            <div className="p-4">
+                              <div className="flex items-center justify-between mb-1">
+                                <h3 className="font-bold text-foreground truncate">{q.clientName}</h3>
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${QUOTE_STATUS_BG[group.status]}`}>
+                                  {group.label}
+                                </span>
+                              </div>
+                              {q.jobType && <p className="text-sm text-muted-foreground mb-2">{q.jobType}</p>}
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(q.createdAt).toLocaleDateString("pt-BR")} · {q.items.length} {q.items.length === 1 ? "item" : "itens"}
+                                </span>
+                                <span className="font-bold text-primary">{fmt(q.total)}</span>
+                              </div>
+                            </div>
+                          </Link>
+                          {showActions && (
+                            <div className="flex gap-2 px-4 pb-3 border-t border-border/50 pt-2">
+                              {group.status === 'enviado' && (
+                                <button
+                                  onClick={async (e) => { e.preventDefault(); await changeQuoteStatus(q.id, 'aguardando'); toast.success('Status: Aguardando Aprovação'); }}
+                                  className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-[hsl(25,90%,55%)]/10 text-[hsl(25,90%,45%)] hover:bg-[hsl(25,90%,55%)]/20 transition-colors"
+                                >
+                                  <Clock className="h-3 w-3" /> Aguardando
+                                </button>
+                              )}
+                              <button
+                                onClick={async (e) => { e.preventDefault(); await changeQuoteStatus(q.id, 'aprovado'); toast.success('Orçamento aprovado! Obra criada. 🎉'); }}
+                                className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors"
+                              >
+                                <CheckCircle2 className="h-3 w-3" /> Aprovar
+                              </button>
+                              <button
+                                onClick={async (e) => { e.preventDefault(); await changeQuoteStatus(q.id, 'perdido'); toast('Marcado como Perdido.'); }}
+                                className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+                              >
+                                <XCircle className="h-3 w-3" /> Perdido
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      </Link>
-                    </motion.div>
-                  ))}
+                      </motion.div>
+                    );
+                  })}
                 </div>
               </div>
             ))}

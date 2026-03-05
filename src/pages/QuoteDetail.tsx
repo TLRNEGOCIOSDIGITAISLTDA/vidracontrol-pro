@@ -7,7 +7,6 @@ import { getQuote, getProfile } from "@/lib/storage";
 import { useData } from "@/lib/DataContext";
 import { Quote, QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from "@/lib/types";
 import { toast } from "sonner";
-import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { generateQuotePdf } from "@/lib/generateQuotePdf";
 import { maskWhatsApp } from "@/lib/whatsappMask";
@@ -59,7 +58,6 @@ const QuoteDetail = () => {
   const currentStatus = (quote?.status || 'orcado') as QuoteStatus;
   const flowIndex = getFlowIndex(currentStatus);
   const isPerdido = currentStatus === 'perdido';
-  const progressValue = isPerdido ? 0 : ((flowIndex + 1) / FLOW_STEPS.length) * 100;
 
   const handleSendWhatsApp = async () => {
     if (!quote || !id) return;
@@ -106,8 +104,8 @@ const QuoteDetail = () => {
 
       // Update status to 'enviado'
       await changeQuoteStatus(id, 'enviado');
-      setQuote({ ...quote, status: 'enviado' });
       toast.success('Orçamento enviado! Status alterado para "Enviado".');
+      navigate('/app');
     } catch (err) {
       toast.error("Erro ao enviar orçamento.");
     } finally {
@@ -140,36 +138,44 @@ const QuoteDetail = () => {
 
       <div className="container py-6 max-w-2xl space-y-4">
 
-        {/* ===== FLOW PROGRESS BAR ===== */}
+        {/* ===== KANBAN FLOW ===== */}
         <div className="bg-card rounded-xl p-4 shadow-card space-y-3">
-          <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase tracking-wide">
-            <span>Fluxo do Orçamento</span>
-            {isPerdido && <span className="text-destructive">Perdido</span>}
+          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
+            Fluxo do Orçamento
           </div>
-          <Progress value={progressValue} className="h-2" />
-          <div className="flex justify-between">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
             {FLOW_STEPS.map((step, i) => {
-              const isActive = !isPerdido && flowIndex >= i;
+              const isDone = !isPerdido && flowIndex > i;
               const isCurrent = !isPerdido && flowIndex === i;
               return (
-                <div key={step.status} className="flex flex-col items-center gap-1">
-                  <div
-                    className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 transition-colors ${
-                      isCurrent
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : isActive
-                          ? 'border-success bg-success text-white'
-                          : 'border-border bg-muted text-muted-foreground'
-                    }`}
-                  >
-                    {i + 1}
+                <div key={step.status} className="flex items-center gap-1.5 flex-shrink-0">
+                  <div className={`flex flex-col items-center gap-1 rounded-xl px-3 py-2.5 min-w-[68px] text-center border transition-colors ${
+                    isCurrent
+                      ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                      : isDone
+                        ? 'bg-success/10 text-success border-success/40'
+                        : 'bg-muted/50 text-muted-foreground border-border'
+                  }`}>
+                    <span className="text-base leading-none">
+                      {isDone ? '✅' : isCurrent ? '🔵' : '⬜'}
+                    </span>
+                    <span className="text-[10px] font-bold leading-tight mt-0.5">{step.label}</span>
                   </div>
-                  <span className={`text-[10px] ${isCurrent ? 'text-primary font-bold' : isActive ? 'text-success font-semibold' : 'text-muted-foreground'}`}>
-                    {step.label}
-                  </span>
+                  {i < FLOW_STEPS.length - 1 && (
+                    <div className={`w-3 h-0.5 flex-shrink-0 rounded ${isDone ? 'bg-success' : 'bg-border'}`} />
+                  )}
                 </div>
               );
             })}
+            <div className="w-3 h-0.5 flex-shrink-0 rounded bg-border" />
+            <div className={`flex flex-col items-center gap-1 rounded-xl px-3 py-2.5 min-w-[68px] text-center border flex-shrink-0 transition-colors ${
+              isPerdido
+                ? 'bg-destructive text-white border-destructive shadow-sm'
+                : 'bg-muted/50 text-muted-foreground border-border'
+            }`}>
+              <span className="text-base leading-none">{isPerdido ? '❌' : '⬜'}</span>
+              <span className="text-[10px] font-bold leading-tight mt-0.5">Perdido</span>
+            </div>
           </div>
         </div>
 
