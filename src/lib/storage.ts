@@ -47,6 +47,8 @@ export async function getQuotes(): Promise<Quote[]> {
     createdAt: r.created_at,
     notes: r.notes || undefined,
     status: (r.status as any) || 'orcado',
+    commission: (r as any).commission_pct ? Number((r as any).commission_pct) : undefined,
+    nfPercent: (r as any).nf_pct ? Number((r as any).nf_pct) : undefined,
     items: (items || []).filter(i => i.quote_id === r.id).map(i => ({
       id: i.id,
       type: i.type as any,
@@ -85,6 +87,8 @@ export async function addQuote(quote: Omit<Quote, 'id' | 'createdAt'>): Promise<
     notes: quote.notes || null,
     status: quote.status || 'orcado',
     company_info: quote.companyInfo as any,
+    commission_pct: quote.commission || 0,
+    nf_pct: quote.nfPercent || 0,
     user_id: uid,
   } as any).select().single();
 

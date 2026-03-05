@@ -12,12 +12,16 @@ export type ExpenseCategory =
   | 'material'
   | 'mao_de_obra'
   | 'transporte'
+  | 'comissao'
+  | 'nf'
   | 'outros';
 
 export const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   material: 'Material',
   mao_de_obra: 'Mão de obra',
   transporte: 'Transporte',
+  comissao: 'Comissão',
+  nf: 'Nota Fiscal',
   outros: 'Outros',
 };
 
@@ -25,6 +29,8 @@ export const CATEGORY_COLORS: Record<ExpenseCategory, string> = {
   material: 'hsl(215, 80%, 45%)',
   mao_de_obra: 'hsl(280, 60%, 50%)',
   transporte: 'hsl(35, 95%, 55%)',
+  comissao: 'hsl(160, 60%, 40%)',
+  nf: 'hsl(200, 70%, 45%)',
   outros: 'hsl(0, 0%, 50%)',
 };
 
@@ -159,4 +165,8 @@ export interface Quote {
   notes?: string;
   status?: QuoteStatus;
   costs?: QuoteCost[];
+  /** Comissão em % sobre o total da obra */
+  commission?: number;
+  /** % da Nota Fiscal sobre o total da obra */
+  nfPercent?: number;
 }

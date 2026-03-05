@@ -4,6 +4,7 @@ import {
   getJobs,
   getQuotes,
   addJob as storageAddJob,
+  addExpense as storageAddExpense,
   addQuoteCost as storageSaveCost,
   deleteQuoteCost as storageDeleteCost,
   deleteJob as storageDeleteJob,
@@ -93,13 +94,31 @@ export function DataProvider({ children }: { children: ReactNode }) {
         area: item.width && item.height ? item.width * item.height / 1_000_000 * item.quantity : undefined,
       }));
 
-      await storageAddJob({
+      const newJob = await storageAddJob({
         clientName: quote.clientName,
         description: `Orçamento aprovado — ${quote.jobType || 'Vidraçaria'}`,
         saleValue: quote.total,
         status: 'em_andamento',
         items: jobItems,
       });
+
+      // Auto-create commission and NF expenses if defined on the quote
+      if (quote.commission && quote.commission > 0) {
+        await storageAddExpense(newJob.id, {
+          description: `Comissão ${quote.commission}%`,
+          category: 'comissao',
+          value: Math.round(quote.total * quote.commission) / 100,
+          photoUrl: undefined,
+        });
+      }
+      if (quote.nfPercent && quote.nfPercent > 0) {
+        await storageAddExpense(newJob.id, {
+          description: `Nota Fiscal ${quote.nfPercent}%`,
+          category: 'nf',
+          value: Math.round(quote.total * quote.nfPercent) / 100,
+          photoUrl: undefined,
+        });
+      }
 
       await refreshJobs();
     }

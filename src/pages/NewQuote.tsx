@@ -39,6 +39,9 @@ const NewQuote = () => {
       total: 0,
     },
   ]);
+  const [commission, setCommission] = useState<number>(0);
+  const [nfRequired, setNfRequired] = useState(false);
+  const [nfPercent, setNfPercent] = useState<number>(0);
   const [showCompany, setShowCompany] = useState(false);
 
   // Load company info async
@@ -106,6 +109,8 @@ const NewQuote = () => {
       total,
       companyInfo: company,
       notes: notes.trim() || undefined,
+      commission: commission > 0 ? commission : undefined,
+      nfPercent: nfRequired && nfPercent > 0 ? nfPercent : undefined,
     });
     toast.success("Orçamento criado!");
     navigate(`/app/orcamento/${quote.id}`);
@@ -185,6 +190,68 @@ const NewQuote = () => {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Comissão & NF */}
+          <div className="bg-card rounded-xl p-4 shadow-card space-y-4">
+            <Label className="text-base font-bold">Custos do Contrato</Label>
+
+            <div>
+              <Label className="text-xs">Comissão (%)</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.5"
+                  value={commission || ""}
+                  onChange={e => setCommission(parseFloat(e.target.value) || 0)}
+                  inputMode="decimal"
+                  placeholder="0"
+                  className="w-28"
+                />
+                <span className="text-sm text-muted-foreground">
+                  {commission > 0 && total > 0
+                    ? `= ${(total * commission / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`
+                    : "nenhuma comissão"}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <Label className="text-xs">NF necessária?</Label>
+                <button
+                  type="button"
+                  onClick={() => setNfRequired(!nfRequired)}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${nfRequired ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${nfRequired ? 'translate-x-4' : 'translate-x-1'}`} />
+                </button>
+                <span className="text-xs text-muted-foreground">{nfRequired ? "Sim" : "Não"}</span>
+              </div>
+              {nfRequired && (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step="0.5"
+                    value={nfPercent || ""}
+                    onChange={e => setNfPercent(parseFloat(e.target.value) || 0)}
+                    inputMode="decimal"
+                    placeholder="0"
+                    className="w-28"
+                  />
+                  <span className="text-xs text-muted-foreground">% NF</span>
+                  {nfPercent > 0 && total > 0 && (
+                    <span className="text-sm text-muted-foreground">
+                      = {(total * nfPercent / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Items */}
@@ -313,7 +380,7 @@ const NewQuote = () => {
 
           {/* Summary footer */}
           {items.length > 0 && (
-            <div className="bg-primary/10 rounded-xl p-4 space-y-1">
+            <div className="bg-primary/10 rounded-xl p-4 space-y-2">
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>Total de m²</span>
                 <span className="font-bold text-foreground">
@@ -324,6 +391,28 @@ const NewQuote = () => {
                 <span className="text-sm text-muted-foreground">Valor Total</span>
                 <span className="text-xl font-bold text-primary">{fmt(total)}</span>
               </div>
+              {(commission > 0 || (nfRequired && nfPercent > 0)) && (
+                <div className="border-t border-primary/20 pt-2 space-y-1">
+                  {commission > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Comissão ({commission}%)</span>
+                      <span className="font-semibold text-destructive">− {fmt(total * commission / 100)}</span>
+                    </div>
+                  )}
+                  {nfRequired && nfPercent > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Nota Fiscal ({nfPercent}%)</span>
+                      <span className="font-semibold text-destructive">− {fmt(total * nfPercent / 100)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm font-bold border-t border-primary/20 pt-1">
+                    <span className="text-muted-foreground">Lucro estimado</span>
+                    <span className="text-success">
+                      {fmt(total - (total * commission / 100) - (nfRequired ? total * nfPercent / 100 : 0))}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
