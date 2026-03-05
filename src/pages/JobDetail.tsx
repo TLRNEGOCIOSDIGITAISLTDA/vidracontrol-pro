@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { Plus, Trash2, Camera, PieChart, CheckCircle } from "lucide-react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Plus, Trash2, Camera, PieChart, CheckCircle, Upload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,20 +12,53 @@ import { useData } from "@/lib/DataContext";
 import { Job, ExpenseCategory, CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/types";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
+
+const EXPENSE_CATEGORY_MAP: Record<string, ExpenseCategory> = {
+  material: 'material',
+  transporte: 'transporte',
+  alimentacao: 'alimentacao',
+  alimentação: 'alimentacao',
+  ferramenta: 'ferramenta',
+  ajudante: 'ajudante',
+  'mao_de_obra': 'ajudante',
+  'mão de obra': 'ajudante',
+  frete: 'transporte',
+  outros: 'outros',
+};
+
+function mapExpenseCategory(raw: string | null): ExpenseCategory {
+  if (!raw) return 'outros';
+  const key = raw.toLowerCase().trim();
+  return EXPENSE_CATEGORY_MAP[key] || 'outros';
+}
+
+function parseDate(raw: string | null): string {
+  if (!raw) return new Date().toISOString().slice(0, 10);
+  const m = raw.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  return new Date().toISOString().slice(0, 10);
+}
 
 const JobDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
-  const isCostCenter = location.pathname.includes("/centro-de-custo/");
-  const backTo = isCostCenter ? "/app/centro-de-custo" : "/app";
   const [job, setJob] = useState<Job | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [expDesc, setExpDesc] = useState("");
   const [expValue, setExpValue] = useState("");
   const [expCategory, setExpCategory] = useState<ExpenseCategory>("material");
+  const [expDate, setExpDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [expPhoto, setExpPhoto] = useState<string | undefined>();
+
+  // AI scan state
+  const [scanning, setScanning] = useState(false);
+  const [scannedPreview, setScannedPreview] = useState<string | null>(null);
+  const [aiConfirm, setAiConfirm] = useState(false);
+
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
 
   const reload = async () => {
     if (id) {
@@ -39,7 +72,7 @@ const JobDetail = () => {
   if (!job) {
     return (
       <div className="min-h-screen bg-background">
-        <AppHeader title="Obra" backTo={backTo} />
+        <AppHeader title="Obra" backTo="/app" />
         <div className="container py-16 text-center text-muted-foreground">Carregando...</div>
       </div>
     );
@@ -56,6 +89,16 @@ const JobDetail = () => {
     return acc;
   }, {});
 
+  const resetForm = () => {
+    setExpDesc("");
+    setExpValue("");
+    setExpCategory("material");
+    setExpDate(new Date().toISOString().slice(0, 10));
+    setExpPhoto(undefined);
+    setScannedPreview(null);
+    setAiConfirm(false);
+  };
+
   const handleAddExpense = async () => {
     if (!expDesc.trim() || !expValue.trim()) {
       toast.error("Preencha a descrição e o valor.");
@@ -67,7 +110,7 @@ const JobDetail = () => {
       return;
     }
     await addExpense(job.id, { description: expDesc.trim(), value: val, category: expCategory, photoUrl: expPhoto });
-    setExpDesc(""); setExpValue(""); setExpCategory("material"); setExpPhoto(undefined);
+    resetForm();
     setDialogOpen(false);
     await reload();
     toast.success("Gasto adicionado!");
@@ -89,7 +132,7 @@ const JobDetail = () => {
   const handleDelete = async () => {
     if (confirm("Tem certeza que deseja excluir esta obra?")) {
       await removeJob(job.id);
-      navigate(backTo);
+      navigate("/app");
       toast.success("Obra excluída.");
     }
   };
@@ -102,9 +145,62 @@ const JobDetail = () => {
     reader.readAsDataURL(file);
   };
 
+  const handleFileSelected = async (file: File) => {
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/heic', 'application/pdf'];
+    if (!validTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.heic')) {
+      toast.error("Formato não suportado. Use JPG, PNG, PDF ou HEIC.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Arquivo muito grande. Máximo 10MB.");
+      return;
+    }
+
+    setScanning(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = btoa(binary);
+      const mimeType = file.type || 'image/jpeg';
+
+      if (mimeType.startsWith('image/')) {
+        setScannedPreview(URL.createObjectURL(file));
+      }
+
+      const { data, error } = await supabase.functions.invoke('analyze-document', {
+        body: { imageBase64: base64, mimeType },
+      });
+
+      if (error) throw error;
+
+      if (data?.data) {
+        const d = data.data;
+        if (d.descricao) setExpDesc(d.descricao);
+        setExpCategory(mapExpenseCategory(d.categoria));
+        if (d.valor_total) setExpValue(String(d.valor_total).replace('.', ','));
+        setExpDate(parseDate(d.data));
+        setAiConfirm(true);
+        toast.success("Documento analisado com sucesso!");
+      } else {
+        toast.error("Não foi possível ler o documento automaticamente. Preencha os campos manualmente.");
+      }
+    } catch (err) {
+      console.error("Scan error:", err);
+      toast.error("Erro ao analisar documento. Preencha os campos manualmente.");
+    } finally {
+      setScanning(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24">
-      <AppHeader title={job.clientName} backTo={backTo} />
+      <AppHeader title={job.clientName} backTo="/app" />
 
       <div className="container py-6 space-y-6 max-w-lg">
         {/* Summary */}
@@ -222,7 +318,7 @@ const JobDetail = () => {
       </div>
 
       {/* Floating add expense button */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
         <DialogTrigger asChild>
           <button className="fixed bottom-6 right-6 w-14 h-14 rounded-full gradient-accent shadow-elevated flex items-center justify-center text-secondary-foreground z-50 active:scale-95 transition-transform">
             <Plus className="h-7 w-7" />
@@ -233,38 +329,120 @@ const JobDetail = () => {
             <DialogTitle>Novo Gasto</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            <div>
-              <Label>Descrição</Label>
-              <Input placeholder="Ex: Vidro temperado 8mm" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="mt-1" />
-            </div>
-            <div>
-              <Label>Valor (R$)</Label>
-              <Input placeholder="Ex: 350" value={expValue} onChange={e => setExpValue(e.target.value)} className="mt-1" inputMode="decimal" />
-            </div>
-            <div>
-              <Label>Categoria</Label>
-              <Select value={expCategory} onValueChange={(v) => setExpCategory(v as ExpenseCategory)}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Foto da Nota (opcional)</Label>
-              <div className="mt-1 flex items-center gap-3">
-                <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-                  <Camera className="h-4 w-4 mr-1" /> {expPhoto ? "Trocar foto" : "Tirar foto / Anexar"}
+
+            {/* AI Scan buttons */}
+            {!aiConfirm && !scanning && (
+              <div className="flex gap-2">
+                <input
+                  ref={cameraRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && handleFileSelected(e.target.files[0])}
+                />
+                <input
+                  ref={uploadRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/heic,application/pdf"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && handleFileSelected(e.target.files[0])}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 gap-1 text-xs"
+                  onClick={() => cameraRef.current?.click()}
+                >
+                  <Camera className="h-4 w-4" /> Tirar Foto da NF
                 </Button>
-                {expPhoto && <img src={expPhoto} alt="preview" className="w-10 h-10 rounded object-cover" />}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 gap-1 text-xs"
+                  onClick={() => uploadRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4" /> Upload NF
+                </Button>
               </div>
-              <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
-            </div>
-            <Button onClick={handleAddExpense} className="w-full">Adicionar Gasto</Button>
+            )}
+
+            {/* Scanning indicator */}
+            {scanning && (
+              <div className="flex items-center justify-center gap-2 py-4 text-primary">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span className="text-sm font-medium">Analisando documento...</span>
+              </div>
+            )}
+
+            {/* AI confirmation banner */}
+            {aiConfirm && (
+              <div className="bg-success/10 border border-success/30 rounded-lg px-3 py-2 text-xs text-success font-medium">
+                ✅ Dados extraídos pela IA — confirme antes de salvar:
+              </div>
+            )}
+
+            {/* Scanned image preview */}
+            {scannedPreview && (
+              <img
+                src={scannedPreview}
+                alt="Nota escaneada"
+                className="w-full max-h-32 object-cover rounded-lg border border-border cursor-pointer"
+                onClick={() => window.open(scannedPreview, '_blank')}
+              />
+            )}
+
+            {!scanning && (
+              <>
+                <div>
+                  <Label>Descrição</Label>
+                  <Input placeholder="Ex: Vidro temperado 8mm" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="mt-1" />
+                </div>
+                <div>
+                  <Label>Valor (R$)</Label>
+                  <Input placeholder="Ex: 350" value={expValue} onChange={e => setExpValue(e.target.value)} className="mt-1" inputMode="decimal" />
+                </div>
+                <div>
+                  <Label>Categoria</Label>
+                  <Select value={expCategory} onValueChange={(v) => setExpCategory(v as ExpenseCategory)}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
+                        <SelectItem key={k} value={k}>{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Data</Label>
+                  <Input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} className="mt-1" />
+                </div>
+                {!aiConfirm && (
+                  <div>
+                    <Label>Foto da Nota (opcional)</Label>
+                    <div className="mt-1 flex items-center gap-3">
+                      <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+                        <Camera className="h-4 w-4 mr-1" /> {expPhoto ? "Trocar foto" : "Anexar foto"}
+                      </Button>
+                      {expPhoto && <img src={expPhoto} alt="preview" className="w-10 h-10 rounded object-cover" />}
+                    </div>
+                    <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
+                  </div>
+                )}
+                <Button onClick={handleAddExpense} className="w-full">
+                  {aiConfirm ? "✅ Confirmar e Salvar" : "Adicionar Gasto"}
+                </Button>
+                {aiConfirm && (
+                  <Button variant="outline" className="w-full" onClick={() => setAiConfirm(false)}>
+                    ✏️ Editar Manualmente
+                  </Button>
+                )}
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>

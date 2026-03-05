@@ -16,7 +16,7 @@ const FLOW_STEPS: { status: QuoteStatus; label: string }[] = [
   { status: 'orcado', label: 'Orçado' },
   { status: 'enviado', label: 'Enviado' },
   { status: 'aguardando', label: 'Aguardando' },
-  { status: 'fechado', label: 'Fechado' },
+  { status: 'aprovado', label: 'Aprovado' },
 ];
 
 function getFlowIndex(status: QuoteStatus): number {
@@ -117,7 +117,7 @@ const QuoteDetail = () => {
 
   const handleApprove = async () => {
     if (!quote || !id) return;
-    await changeQuoteStatus(id, 'fechado');
+    await changeQuoteStatus(id, 'aprovado');
     toast.success("Orçamento aprovado! Obra criada automaticamente em Minhas Obras. 🎉");
     navigate("/app");
   };
@@ -193,7 +193,7 @@ const QuoteDetail = () => {
             </>
           )}
 
-          {currentStatus === 'fechado' && (
+          {currentStatus === 'aprovado' && (
             <div className="flex-1 bg-success/10 text-success rounded-lg px-4 py-3 text-sm font-bold text-center">
               ✅ Orçamento aprovado — Obra criada em Minhas Obras
             </div>

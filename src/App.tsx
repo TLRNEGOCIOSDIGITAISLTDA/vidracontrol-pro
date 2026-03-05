@@ -15,7 +15,6 @@ import ResetPassword from "./pages/ResetPassword";
 import AppDashboard from "./pages/AppDashboard";
 import NewJob from "./pages/NewJob";
 import JobDetail from "./pages/JobDetail";
-import CostCenter from "./pages/CostCenter";
 import QuoteList from "./pages/QuoteList";
 import NewQuote from "./pages/NewQuote";
 import QuoteDetail from "./pages/QuoteDetail";
@@ -43,8 +42,6 @@ const App = () => (
           <Route path="/app" element={<ProtectedRoute><AppDashboard /></ProtectedRoute>} />
           <Route path="/app/nova-obra" element={<ProtectedRoute><NewJob /></ProtectedRoute>} />
           <Route path="/app/obra/:id" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
-          <Route path="/app/centro-de-custo" element={<ProtectedRoute><CostCenter /></ProtectedRoute>} />
-          <Route path="/app/centro-de-custo/obra/:id" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
           <Route path="/app/orcamentos" element={<ProtectedRoute><QuoteList /></ProtectedRoute>} />
           <Route path="/app/novo-orcamento" element={<ProtectedRoute><NewQuote /></ProtectedRoute>} />
           <Route path="/app/orcamento/:id" element={<ProtectedRoute><QuoteDetail /></ProtectedRoute>} />

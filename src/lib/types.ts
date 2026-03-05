@@ -101,13 +101,13 @@ export interface CompanyInfo {
   logoUrl?: string;
 }
 
-export type QuoteStatus = 'orcado' | 'enviado' | 'aguardando' | 'fechado' | 'perdido';
+export type QuoteStatus = 'orcado' | 'enviado' | 'aguardando' | 'aprovado' | 'perdido';
 
 export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
   orcado: 'Orçado',
   enviado: 'Enviado',
   aguardando: 'Aguardando Aprovação',
-  fechado: 'Fechado',
+  aprovado: 'Aprovado pelo Cliente',
   perdido: 'Perdido',
 };
 
@@ -115,7 +115,7 @@ export const QUOTE_STATUS_COLORS: Record<QuoteStatus, string> = {
   orcado: 'hsl(45, 95%, 50%)',
   enviado: 'hsl(215, 80%, 55%)',
   aguardando: 'hsl(25, 90%, 55%)',
-  fechado: 'hsl(145, 60%, 42%)',
+  aprovado: 'hsl(145, 60%, 42%)',
   perdido: 'hsl(0, 70%, 50%)',
 };
 
@@ -123,7 +123,7 @@ export const QUOTE_STATUS_BG: Record<QuoteStatus, string> = {
   orcado: 'bg-[hsl(45,95%,50%)]/10 text-[hsl(45,95%,40%)]',
   enviado: 'bg-[hsl(215,80%,55%)]/10 text-[hsl(215,80%,45%)]',
   aguardando: 'bg-[hsl(25,90%,55%)]/10 text-[hsl(25,90%,45%)]',
-  fechado: 'bg-success/10 text-success',
+  aprovado: 'bg-success/10 text-success',
   perdido: 'bg-destructive/10 text-destructive',
 };
 

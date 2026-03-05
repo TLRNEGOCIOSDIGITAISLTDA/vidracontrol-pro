@@ -75,8 +75,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const prevStatus = quote.status || 'orcado';
     await saveQuoteStatus(quoteId, newStatus);
 
-    // When moving to "fechado", auto-create a Job from the quote
-    if (newStatus === 'fechado' && prevStatus !== 'fechado') {
+    // When moving to "aprovado", auto-create a Job from the quote
+    if (newStatus === 'aprovado' && prevStatus !== 'aprovado') {
       const jobItems: JobItem[] = quote.items.map(item => ({
         id: crypto.randomUUID(),
         type: item.type,

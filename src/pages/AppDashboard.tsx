@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronDown, Wallet, Trash2, Percent, CalendarDays } from "lucide-react";
+import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronDown, Trash2, Percent, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { useData } from "@/lib/DataContext";
@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { toast } from "sonner";
 
-const ALL_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'fechado', 'perdido'];
+const ALL_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'aprovado', 'perdido'];
 const ACTIVE_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'perdido'];
 
 const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -41,8 +41,8 @@ const AppDashboard = () => {
 
   useEffect(() => { refreshAll(); }, [refreshAll]);
 
-  // Sales/Costs/Profit from closed quotes (Centro de Custo)
-  const closedQuotes = quotes.filter(q => q.status === "fechado");
+  // Sales/Costs/Profit from approved quotes
+  const closedQuotes = quotes.filter(q => q.status === "aprovado");
   const totalSales = closedQuotes.reduce((s, q) => s + q.total, 0);
   const totalCosts = closedQuotes.reduce((s, q) => s + (q.costs || []).reduce((cs, c) => cs + c.value, 0), 0);
   const totalProfit = totalSales - totalCosts;
@@ -79,11 +79,10 @@ const AppDashboard = () => {
       quotes: filtered,
     };
   });
-  const activeQuotes = quotes.filter(q => (q.status || 'orcado') !== 'fechado');
+  const activeQuotes = quotes.filter(q => (q.status || 'orcado') !== 'aprovado');
 
   const hasQuotes = quotes.length > 0;
   const [quotesOpen, setQuotesOpen] = useState(false);
-  const [costsOpen, setCostsOpen] = useState(false);
   const [jobsOpen, setJobsOpen] = useState(false);
   const [monthlyOpen, setMonthlyOpen] = useState(false);
 
@@ -334,52 +333,6 @@ const AppDashboard = () => {
                     </div>
                   </div>
                 ))
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Centro de Custo */}
-        <div>
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-foreground">Centro de Custo</h2>
-            <div className="flex items-center gap-2">
-              <Link to="/app/centro-de-custo">
-                <Button size="sm"><Wallet className="h-4 w-4 mr-1" /> Gerenciar</Button>
-              </Link>
-              <Button size="sm" variant="outline" onClick={() => setCostsOpen(!costsOpen)} className="gap-1">
-                Ver todos
-                <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${costsOpen ? "rotate-180" : ""}`} />
-              </Button>
-            </div>
-          </div>
-          <div className="overflow-hidden transition-all duration-300 ease-out" style={{ maxHeight: costsOpen ? `${closedQuotes.length * 140 + 100}px` : "0px", opacity: costsOpen ? 1 : 0 }}>
-            <div className="pt-3 space-y-3">
-              {closedQuotes.length === 0 ? (
-                <div className="text-center py-10">
-                  <Wallet className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
-                  <p className="text-muted-foreground">Nenhum orçamento fechado no centro de custo.</p>
-                </div>
-              ) : (
-                closedQuotes.map((quote, i) => {
-                  const costs = (quote.costs || []).reduce((s, c) => s + c.value, 0);
-                  const profit = quote.total - costs;
-                  return (
-                    <motion.div key={quote.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-                      <Link to="/app/centro-de-custo">
-                        <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow">
-                          <div className="flex items-center justify-between mb-2">
-                            <h3 className="font-bold text-foreground truncate">{quote.clientName}</h3>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm">
-                            <span className="text-muted-foreground">Venda: <strong className="text-foreground">{fmt(quote.total)}</strong></span>
-                            <span className="text-muted-foreground">Lucro: <strong className={profit >= 0 ? "text-success" : "text-destructive"}>{fmt(profit)}</strong></span>
-                          </div>
-                        </div>
-                      </Link>
-                    </motion.div>
-                  );
-                })
               )}
             </div>
           </div>

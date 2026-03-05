@@ -34,7 +34,7 @@ function parseDate(raw: string | null): string {
 
 const CostCenter = () => {
   const { quotes, addCost, removeCost } = useData();
-  const closedQuotes = quotes.filter(q => q.status === "fechado");
+  const closedQuotes = quotes.filter(q => q.status === "aprovado");
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState<string | null>(null);

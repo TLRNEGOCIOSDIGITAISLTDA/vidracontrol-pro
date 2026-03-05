@@ -358,14 +358,15 @@ export async function saveProfile(profile: { whatsapp: string; fullName: string 
 
 // ---- Clear all data ----
 export async function clearAllData() {
+  const uid = await getUserId();
   await Promise.all([
-    supabase.from('quote_costs').delete().neq('id', ''),
-    supabase.from('quote_items').delete().neq('id', ''),
-    supabase.from('job_expenses').delete().neq('id', ''),
-    supabase.from('job_items').delete().neq('id', ''),
+    supabase.from('quote_costs').delete().eq('user_id', uid),
+    supabase.from('quote_items').delete().eq('user_id', uid),
+    supabase.from('job_expenses').delete().eq('user_id', uid),
+    supabase.from('job_items').delete().eq('user_id', uid),
   ]);
   await Promise.all([
-    supabase.from('quotes').delete().neq('id', ''),
-    supabase.from('jobs').delete().neq('id', ''),
+    supabase.from('quotes').delete().eq('user_id', uid),
+    supabase.from('jobs').delete().eq('user_id', uid),
   ]);
 }
