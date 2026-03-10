@@ -41,7 +41,7 @@ const Signup = () => {
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: "https://vidro-lucro-control.vercel.app/login" },
     });
     setLoading(false);
 
