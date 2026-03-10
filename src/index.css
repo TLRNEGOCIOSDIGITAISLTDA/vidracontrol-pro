@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+/* Fonte carregada via <link> no index.html para evitar bloqueio no 3G/4G */
 
 @layer base {
   :root {
@@ -136,9 +136,36 @@
   }
 }
 
-/* Larger inputs and buttons on mobile */
+/* Previne zoom ao focar campos no iOS */
 @media (max-width: 768px) {
   input, select, textarea, button {
-    font-size: 16px !important; /* Prevent zoom on iOS */
+    font-size: 16px !important;
   }
+}
+
+/* Scroll suave em todo o app */
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Evita highlight azul ao tocar em elementos no mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Garante altura mínima de 48px em botões de ação (Material Design guideline) */
+.btn-touch {
+  min-height: 48px;
+}
+
+/* Melhora legibilidade de textos pequenos em telas OLED */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Safe area top para notch/dynamic island */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
 }

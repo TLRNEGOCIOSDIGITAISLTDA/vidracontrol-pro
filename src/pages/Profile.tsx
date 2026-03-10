@@ -67,7 +67,7 @@ const Profile = () => {
               <p className="text-xs text-destructive">Número incompleto</p>
             )}
           </div>
-          <Button className="w-full" onClick={handleSave} disabled={saving}>
+          <Button className="w-full" size="lg" onClick={handleSave} disabled={saving}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Salvar
           </Button>

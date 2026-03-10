@@ -136,7 +136,7 @@ const Signup = () => {
             <Input id="confirmPw" type="password" placeholder="Repita a senha" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} required autoComplete="new-password" />
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading || !passwordValid || !isValidWhatsApp(whatsapp)}>
+          <Button type="submit" className="w-full" size="lg" disabled={loading || !passwordValid || !isValidWhatsApp(whatsapp)}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Criar Conta
           </Button>

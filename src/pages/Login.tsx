@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -6,10 +6,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calculator, Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import InstallBanner from "@/components/app/InstallBanner";
 
 const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
+
+  // Redireciona se já tem sessão ativa
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) navigate("/app", { replace: true });
+    });
+  }, [navigate]);
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -84,7 +92,7 @@ const Login = () => {
             </div>
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" size="lg" disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Entrar
           </Button>
@@ -102,6 +110,7 @@ const Login = () => {
           </p>
         </div>
       </div>
+      <InstallBanner />
     </div>
   );
 };

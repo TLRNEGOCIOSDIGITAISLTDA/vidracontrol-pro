@@ -12,7 +12,7 @@ const AppHeader = ({ title = "VidraControl", backTo }: AppHeaderProps) => {
   const { signOut } = useAuth();
 
   return (
-    <header className="sticky top-0 z-40 bg-card/90 backdrop-blur-lg border-b border-border">
+    <header className="sticky top-0 z-40 bg-card/90 backdrop-blur-lg border-b border-border safe-area-top">
       <div className="container flex items-center h-14 gap-3">
         {backTo ? (
           <Link to={backTo}>

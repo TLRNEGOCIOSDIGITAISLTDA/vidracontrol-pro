@@ -1,9 +1,10 @@
-const CACHE_NAME = 'vidracontrol-v2';
+const CACHE_NAME = 'vidracontrol-v3';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
   '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  '/icons/icon-512.png',
+  '/favicon.ico',
 ];
 
 self.addEventListener('install', (event) => {
@@ -25,16 +26,34 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Never cache auth-related or API requests
+  // Nunca cacheia: auth, APIs do Supabase, Google Fonts CSS (para sempre buscar a última versão)
   if (
     event.request.method !== 'GET' ||
     url.pathname.startsWith('/~oauth') ||
-    url.hostname.includes('supabase')
+    url.hostname.includes('supabase') ||
+    url.hostname.includes('googleapis.com')
   ) {
     return;
   }
 
-  // Network-first for navigation, cache-first for assets
+  // Fontes do Google: cache-first (após primeira carga, funcionam offline)
+  if (url.hostname.includes('gstatic.com')) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(event.request).then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
+  // Navegação SPA: network-first, fallback para cache ou /
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
@@ -43,20 +62,25 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
           return response;
         })
-        .catch(() => caches.match(event.request).then((r) => r || caches.match('/')))
+        .catch(() =>
+          caches.match(event.request)
+            .then((r) => r || caches.match('/'))
+        )
     );
-  } else {
-    event.respondWith(
-      caches.match(event.request).then((cached) => {
-        if (cached) return cached;
-        return fetch(event.request).then((response) => {
-          if (response.ok && response.type === 'basic') {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        });
-      })
-    );
+    return;
   }
+
+  // Assets estáticos (JS, CSS, imagens): cache-first
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached;
+      return fetch(event.request).then((response) => {
+        if (response.ok && response.type === 'basic') {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => cached || new Response('Offline', { status: 503 }));
+    })
+  );
 });

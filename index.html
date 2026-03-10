@@ -2,25 +2,44 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>VidraControl - Controle de Gastos para Vidraceiros</title>
     <meta name="description" content="App de controle de gastos para vidraceiros autônomos. Registre custos, tire foto da nota e saiba quanto você lucra em cada obra.">
-    
-    
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1e40af">
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <!-- iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="VidraControl">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192.png">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+    <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="VidraControl - Controle de Gastos para Vidraceiros">
-  <meta name="twitter:title" content="VidraControl - Controle de Gastos para Vidraceiros">
-  <meta property="og:description" content="App de controle de gastos para vidraceiros autônomos. Registre custos, tire foto da nota e saiba quanto você lucra em cada obra.">
-  <meta name="twitter:description" content="App de controle de gastos para vidraceiros autônomos. Registre custos, tire foto da nota e saiba quanto você lucra em cada obra.">
-  <meta property="og:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/97eee10e-1a1f-4e61-a7d5-03d498a106ae/id-preview-d538d5a9--60f974f9-9f38-4591-9f05-3d67c059888f.lovable.app-1772213958472.png">
-  <meta name="twitter:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/97eee10e-1a1f-4e61-a7d5-03d498a106ae/id-preview-d538d5a9--60f974f9-9f38-4591-9f05-3d67c059888f.lovable.app-1772213958472.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#1e40af">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="apple-touch-icon" href="/icons/icon-192.png">
-</head>
+    <meta property="og:description" content="App de controle de gastos para vidraceiros autônomos. Registre custos, tire foto da nota e saiba quanto você lucra em cada obra.">
+    <meta property="og:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/97eee10e-1a1f-4e61-a7d5-03d498a106ae/id-preview-d538d5a9--60f974f9-9f38-4591-9f05-3d67c059888f.lovable.app-1772213958472.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="VidraControl - Controle de Gastos para Vidraceiros">
+    <meta name="twitter:description" content="App de controle de gastos para vidraceiros autônomos. Registre custos, tire foto da nota e saiba quanto você lucra em cada obra.">
+    <meta name="twitter:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/97eee10e-1a1f-4e61-a7d5-03d498a106ae/id-preview-d538d5a9--60f974f9-9f38-4591-9f05-3d67c059888f.lovable.app-1772213958472.png">
+
+    <!-- Google Fonts — preconnect + link no HTML é mais rápido que @import no CSS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"></noscript>
+  </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
