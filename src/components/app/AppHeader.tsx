@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Calculator, ArrowLeft, LogOut, User } from "lucide-react";
+import { Calculator, ArrowLeft, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -16,7 +16,7 @@ const AppHeader = ({ title = "VidraControl", backTo }: AppHeaderProps) => {
       <div className="container flex items-center h-14 gap-3">
         {backTo ? (
           <Link to={backTo}>
-            <Button variant="ghost" size="icon" className="text-muted-foreground">
+            <Button variant="ghost" size="icon" className="text-muted-foreground touch-target">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
@@ -24,15 +24,10 @@ const AppHeader = ({ title = "VidraControl", backTo }: AppHeaderProps) => {
           <Calculator className="h-5 w-5 text-primary" />
         )}
         <h1 className="font-bold text-foreground text-lg truncate flex-1">{title}</h1>
-        <Link to="/app/perfil">
-          <Button variant="ghost" size="icon" className="text-muted-foreground" title="Meu Perfil">
-            <User className="h-5 w-5" />
-          </Button>
-        </Link>
         <Button
           variant="ghost"
           size="icon"
-          className="text-muted-foreground hover:text-destructive"
+          className="text-muted-foreground hover:text-destructive touch-target"
           onClick={signOut}
           title="Sair"
         >
