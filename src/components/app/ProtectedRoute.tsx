@@ -1,6 +1,8 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { Loader2 } from "lucide-react";
+import BottomNav from "./BottomNav";
+import InstallBanner from "./InstallBanner";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -17,7 +19,13 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/login" replace />;
   }
 
-  return <>{children}</>;
+  return (
+    <div className="pb-bottom-nav">
+      {children}
+      <BottomNav />
+      <InstallBanner />
+    </div>
+  );
 };
 
 export default ProtectedRoute;
