@@ -103,7 +103,7 @@ type ItemLocal = QuoteItem & { _catalogUnit?: string };
 
 const calcItemTotal = (item: ItemLocal): number => {
   if (item._catalogUnit === 'm²' && item.width && item.height) {
-    const area = (item.width * item.height / 1_000_000) * item.quantity;
+    const area = (item.width * item.height / 10_000) * item.quantity;
     return area * item.unitPrice;
   }
   return item.quantity * item.unitPrice;
@@ -427,29 +427,29 @@ const NewQuote = () => {
                   {(item._catalogUnit === 'm²' || !item._catalogUnit) && (
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label className="text-xs">Largura (mm)</Label>
+                        <Label className="text-xs">Largura (cm)</Label>
                         <Input
                           className="mt-1"
                           type="number"
                           min={0}
-                          step="1"
+                          step="0.1"
                           value={item.width || ""}
                           onChange={e => updateItem(item.id, { width: parseFloat(e.target.value) || undefined })}
-                          inputMode="numeric"
-                          placeholder="1200"
+                          inputMode="decimal"
+                          placeholder="120"
                         />
                       </div>
                       <div>
-                        <Label className="text-xs">Altura (mm)</Label>
+                        <Label className="text-xs">Altura (cm)</Label>
                         <Input
                           className="mt-1"
                           type="number"
                           min={0}
-                          step="1"
+                          step="0.1"
                           value={item.height || ""}
                           onChange={e => updateItem(item.id, { height: parseFloat(e.target.value) || undefined })}
-                          inputMode="numeric"
-                          placeholder="800"
+                          inputMode="decimal"
+                          placeholder="80"
                         />
                       </div>
                     </div>
@@ -491,10 +491,10 @@ const NewQuote = () => {
                       <div className="flex justify-between text-xs text-muted-foreground">
                         <span>Área</span>
                         <span className="font-medium text-foreground">
-                          {(item.width * item.height / 1_000_000 * item.quantity).toFixed(4)} m²
+                          {(item.width * item.height / 10_000 * item.quantity).toFixed(4)} m²
                           {item.quantity > 1 && (
                             <span className="text-muted-foreground font-normal">
-                              {' '}({item.quantity} × {(item.width * item.height / 1_000_000).toFixed(4)} m²)
+                              {' '}({item.quantity} × {(item.width * item.height / 10_000).toFixed(4)} m²)
                             </span>
                           )}
                         </span>
@@ -502,13 +502,13 @@ const NewQuote = () => {
                       <div className="flex justify-between text-xs text-muted-foreground">
                         <span>Cálculo</span>
                         <span>
-                          {(item.width * item.height / 1_000_000 * item.quantity).toFixed(4)} m² × {fmt(item.unitPrice)}/m²
+                          {(item.width * item.height / 10_000 * item.quantity).toFixed(4)} m² × {fmt(item.unitPrice)}/m²
                         </span>
                       </div>
                     </div>
                   ) : (item.width && item.height && !item._catalogUnit) ? (
                     <div className="text-xs text-muted-foreground">
-                      Área: {(item.width * item.height / 1_000_000 * item.quantity).toFixed(4)} m²
+                      Área: {(item.width * item.height / 10_000 * item.quantity).toFixed(4)} m²
                     </div>
                   ) : null}
 
@@ -530,7 +530,7 @@ const NewQuote = () => {
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>Total de m²</span>
                 <span className="font-bold text-foreground">
-                  {items.reduce((s, i) => s + ((i.width || 0) * (i.height || 0) / 1_000_000 * i.quantity), 0).toFixed(4)} m²
+                  {items.reduce((s, i) => s + ((i.width || 0) * (i.height || 0) / 10_000 * i.quantity), 0).toFixed(4)} m²
                 </span>
               </div>
               <div className="flex justify-between">
