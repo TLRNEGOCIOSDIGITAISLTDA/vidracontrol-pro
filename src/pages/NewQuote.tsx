@@ -507,6 +507,14 @@ const NewQuote = () => {
                           </span>
                         </div>
                       )}
+                      {item._catalogUnit !== 'm²' && item.unitPrice > 0 && (
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>Valor/m²</span>
+                          <span className="font-medium text-foreground">
+                            {fmt(item.unitPrice / (item.width! * item.height! / 10_000))}/m²
+                          </span>
+                        </div>
+                      )}
                     </div>
                   ) : null}
 
