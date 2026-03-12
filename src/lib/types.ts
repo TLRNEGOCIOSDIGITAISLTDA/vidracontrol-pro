@@ -153,6 +153,32 @@ export interface UserProfile {
   fullName: string;
 }
 
+export type ProductCategory = 'Vidro' | 'Espelho' | 'Esquadria' | 'Mão de Obra' | 'Outro';
+
+export const PRODUCT_CATEGORIES: ProductCategory[] = ['Vidro', 'Espelho', 'Esquadria', 'Mão de Obra', 'Outro'];
+
+export const PRODUCT_UNITS = ['m²', 'unidade', 'hora', 'metro', 'kit', 'par'];
+
+export const PRODUCT_CATEGORY_COLORS: Record<ProductCategory, string> = {
+  'Vidro': 'bg-blue-100 text-blue-700',
+  'Espelho': 'bg-purple-100 text-purple-700',
+  'Esquadria': 'bg-orange-100 text-orange-700',
+  'Mão de Obra': 'bg-green-100 text-green-700',
+  'Outro': 'bg-gray-100 text-gray-600',
+};
+
+export interface Product {
+  id: string;
+  userId: string;
+  name: string;
+  unit: string;
+  unitPrice: number;
+  category: ProductCategory;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Quote {
   id: string;
   clientName: string;

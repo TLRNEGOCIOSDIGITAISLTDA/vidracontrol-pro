@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Job, Expense, Quote, CompanyInfo, QuoteCost, JobItem, QuoteItem, UserProfile } from './types';
+import { Job, Expense, Quote, CompanyInfo, QuoteCost, JobItem, QuoteItem, UserProfile, Product, ProductCategory } from './types';
 
 async function getUserId(): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -363,6 +363,61 @@ export async function saveProfile(profile: { whatsapp: string; fullName: string 
       full_name: profile.fullName,
     } as any);
   }
+}
+
+// ---- Products ----
+
+function rowToProduct(r: any): Product {
+  return {
+    id: r.id,
+    userId: r.user_id,
+    name: r.name,
+    unit: r.unit,
+    unitPrice: Number(r.unit_price),
+    category: r.category as ProductCategory,
+    active: r.active,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export async function getProducts(includeInactive = false): Promise<Product[]> {
+  let query = supabase.from('products' as any).select('*').order('name');
+  if (!includeInactive) query = query.eq('active', true);
+  const { data } = await query;
+  return (data || []).map(rowToProduct);
+}
+
+export async function addProduct(product: Omit<Product, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<Product> {
+  const uid = await getUserId();
+  const { data, error } = await supabase.from('products' as any).insert({
+    user_id: uid,
+    name: product.name,
+    unit: product.unit,
+    unit_price: product.unitPrice,
+    category: product.category,
+    active: product.active,
+  } as any).select().single();
+  if (error || !data) throw new Error(error?.message || 'Erro ao criar produto');
+  await logAudit('create', 'product', (data as any).id, { name: product.name });
+  return rowToProduct(data);
+}
+
+export async function updateProduct(id: string, updates: Partial<Omit<Product, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>): Promise<void> {
+  const payload: any = {};
+  if (updates.name !== undefined) payload.name = updates.name;
+  if (updates.unit !== undefined) payload.unit = updates.unit;
+  if (updates.unitPrice !== undefined) payload.unit_price = updates.unitPrice;
+  if (updates.category !== undefined) payload.category = updates.category;
+  if (updates.active !== undefined) payload.active = updates.active;
+  payload.updated_at = new Date().toISOString();
+  await supabase.from('products' as any).update(payload as any).eq('id', id);
+  await logAudit('update', 'product', id, payload);
+}
+
+export async function deleteProduct(id: string): Promise<void> {
+  await supabase.from('products' as any).delete().eq('id', id);
+  await logAudit('delete', 'product', id);
 }
 
 // ---- Clear all data ----

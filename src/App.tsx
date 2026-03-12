@@ -20,6 +20,7 @@ import QuoteList from "./pages/QuoteList";
 import NewQuote from "./pages/NewQuote";
 import QuoteDetail from "./pages/QuoteDetail";
 import Profile from "./pages/Profile";
+import Products from "./pages/Products";
 import NotFound from "./pages/NotFound";
 import PublicQuoteView from "./pages/PublicQuoteView";
 
@@ -47,6 +48,7 @@ const App = () => (
           <Route path="/app/novo-orcamento" element={<ProtectedRoute><NewQuote /></ProtectedRoute>} />
           <Route path="/app/orcamento/:id" element={<ProtectedRoute><QuoteDetail /></ProtectedRoute>} />
           <Route path="/app/perfil" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/app/produtos" element={<ProtectedRoute><Products /></ProtectedRoute>} />
           <Route path="/orcamento-publico/:id" element={<PublicQuoteView />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

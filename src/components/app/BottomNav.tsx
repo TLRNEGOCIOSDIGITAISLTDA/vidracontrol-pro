@@ -1,10 +1,11 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, Briefcase, FileText, User } from "lucide-react";
+import { LayoutDashboard, Briefcase, FileText, Package, User } from "lucide-react";
 
 const tabs = [
   { to: "/app", icon: LayoutDashboard, label: "Início" },
   { to: "/app/nova-obra", icon: Briefcase, label: "Nova Obra" },
   { to: "/app/orcamentos", icon: FileText, label: "Orçamentos" },
+  { to: "/app/produtos", icon: Package, label: "Produtos" },
   { to: "/app/perfil", icon: User, label: "Perfil" },
 ];
 

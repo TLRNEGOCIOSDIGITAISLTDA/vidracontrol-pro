@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, X, Search } from "lucide-react";
 import { maskWhatsApp, isValidWhatsApp } from "@/lib/whatsappMask";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AppHeader from "@/components/app/AppHeader";
-import { addQuote, getCompanyInfo, saveCompanyInfo } from "@/lib/storage";
-import { QuoteItem, QuoteItemType, QUOTE_ITEM_LABELS, CompanyInfo } from "@/lib/types";
+import { addQuote, getCompanyInfo, saveCompanyInfo, getProducts } from "@/lib/storage";
+import { QuoteItem, QuoteItemType, QUOTE_ITEM_LABELS, CompanyInfo, Product } from "@/lib/types";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -21,6 +21,82 @@ const JOB_TYPES = [
   "Obra Nova",
   "Outro",
 ];
+
+// Componente de busca de produto para autocompletar
+const ProductSearch = ({
+  products,
+  onSelect,
+}: {
+  products: Product[];
+  onSelect: (p: Product) => void;
+}) => {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const filtered = query.trim()
+    ? products.filter(p =>
+        p.name.toLowerCase().includes(query.toLowerCase()) ||
+        p.category.toLowerCase().includes(query.toLowerCase())
+      ).slice(0, 8)
+    : [];
+
+  // Fecha ao clicar fora
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const select = (p: Product) => {
+    onSelect(p);
+    setQuery("");
+    setOpen(false);
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+        <Input
+          className="pl-8 text-sm h-9"
+          placeholder="Buscar produto do catálogo..."
+          value={query}
+          onChange={e => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+        />
+        {query && (
+          <button
+            type="button"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+            onClick={() => { setQuery(""); setOpen(false); }}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      {open && filtered.length > 0 && (
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-popover border border-border rounded-lg shadow-lg overflow-hidden">
+          {filtered.map(p => (
+            <button
+              key={p.id}
+              type="button"
+              className="w-full text-left px-3 py-2.5 hover:bg-muted flex items-center justify-between gap-2"
+              onMouseDown={() => select(p)}
+            >
+              <span className="text-sm font-medium truncate">{p.name}</span>
+              <span className="text-xs text-muted-foreground shrink-0">
+                {p.unitPrice.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} / {p.unit}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const NewQuote = () => {
   const navigate = useNavigate();
@@ -43,10 +119,12 @@ const NewQuote = () => {
   const [nfRequired, setNfRequired] = useState(false);
   const [nfPercent, setNfPercent] = useState<number>(0);
   const [showCompany, setShowCompany] = useState(false);
+  const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
 
-  // Load company info async
+  // Load company info e catálogo
   useEffect(() => {
     getCompanyInfo().then(setCompany);
+    getProducts().then(setCatalogProducts);
   }, []);
 
   const addItem = () => {
@@ -79,6 +157,22 @@ const NewQuote = () => {
 
   const removeItem = (id: string) => {
     setItems(prev => prev.filter(i => i.id !== id));
+  };
+
+  const applyProduct = (itemId: string, product: Product) => {
+    setItems(prev =>
+      prev.map(item => {
+        if (item.id !== itemId) return item;
+        const updated = {
+          ...item,
+          type: "personalizado" as QuoteItemType,
+          description: product.name,
+          unitPrice: product.unitPrice,
+        };
+        updated.total = updated.quantity * updated.unitPrice;
+        return updated;
+      })
+    );
   };
 
   const total = items.reduce((s, i) => s + i.total, 0);
@@ -275,6 +369,13 @@ const NewQuote = () => {
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
+
+                  {catalogProducts.length > 0 && (
+                    <ProductSearch
+                      products={catalogProducts}
+                      onSelect={p => applyProduct(item.id, p)}
+                    />
+                  )}
 
                   <Select value={item.type} onValueChange={(v: QuoteItemType) => updateItem(item.id, { type: v })}>
                     <SelectTrigger>
