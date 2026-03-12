@@ -98,6 +98,17 @@ const ProductSearch = ({
   );
 };
 
+// Extende QuoteItem com unidade do catálogo (não salva no banco)
+type ItemLocal = QuoteItem & { _catalogUnit?: string };
+
+const calcItemTotal = (item: ItemLocal): number => {
+  if (item._catalogUnit === 'm²' && item.width && item.height) {
+    const area = (item.width * item.height / 1_000_000) * item.quantity;
+    return area * item.unitPrice;
+  }
+  return item.quantity * item.unitPrice;
+};
+
 const NewQuote = () => {
   const navigate = useNavigate();
   const [company, setCompany] = useState<CompanyInfo>({ name: '', cnpjCpf: '', phone: '', email: '', address: '' });
@@ -105,7 +116,7 @@ const NewQuote = () => {
   const [clientPhone, setClientPhone] = useState("");
   const [jobType, setJobType] = useState("");
   const [notes, setNotes] = useState("");
-  const [items, setItems] = useState<QuoteItem[]>([
+  const [items, setItems] = useState<ItemLocal[]>([
     {
       id: crypto.randomUUID(),
       type: "vidro_comum",
@@ -120,8 +131,6 @@ const NewQuote = () => {
   const [nfPercent, setNfPercent] = useState<number>(0);
   const [showCompany, setShowCompany] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
-  // Unidade do produto do catálogo por item ('' = sem produto selecionado)
-  const [itemUnits, setItemUnits] = useState<Record<string, string>>({});
 
   // Load company info e catálogo
   useEffect(() => {
@@ -130,8 +139,8 @@ const NewQuote = () => {
   }, []);
 
   const addItem = () => {
-    setItems([
-      ...items,
+    setItems(prev => [
+      ...prev,
       {
         id: crypto.randomUUID(),
         type: "vidro_comum",
@@ -143,23 +152,15 @@ const NewQuote = () => {
     ]);
   };
 
-  const calcTotal = (item: QuoteItem, unit: string): number => {
-    if (unit === 'm²' && item.width && item.height) {
-      const area = (item.width * item.height / 1_000_000) * item.quantity;
-      return area * item.unitPrice;
-    }
-    return item.quantity * item.unitPrice;
-  };
-
-  const updateItem = (id: string, field: Partial<QuoteItem>) => {
+  const updateItem = (id: string, field: Partial<ItemLocal>) => {
     setItems(prev =>
       prev.map(item => {
         if (item.id !== id) return item;
-        const updated = { ...item, ...field };
+        const updated: ItemLocal = { ...item, ...field };
         if (field.type && field.type !== "personalizado") {
           updated.description = QUOTE_ITEM_LABELS[field.type];
         }
-        updated.total = calcTotal(updated, itemUnits[id] || '');
+        updated.total = calcItemTotal(updated);
         return updated;
       })
     );
@@ -167,23 +168,21 @@ const NewQuote = () => {
 
   const removeItem = (id: string) => {
     setItems(prev => prev.filter(i => i.id !== id));
-    setItemUnits(prev => { const n = { ...prev }; delete n[id]; return n; });
   };
 
   const applyProduct = (itemId: string, product: Product) => {
-    setItemUnits(prev => ({ ...prev, [itemId]: product.unit }));
     setItems(prev =>
       prev.map(item => {
         if (item.id !== itemId) return item;
-        const updated: QuoteItem = {
+        const updated: ItemLocal = {
           ...item,
+          _catalogUnit: product.unit,
           type: "personalizado" as QuoteItemType,
           description: product.name,
           unitPrice: product.unitPrice,
-          // Limpa dimensões ao trocar para unidade não-m²
           ...(product.unit !== 'm²' ? { width: undefined, height: undefined } : {}),
         };
-        updated.total = calcTotal(updated, product.unit);
+        updated.total = calcItemTotal(updated);
         return updated;
       })
     );
@@ -392,7 +391,7 @@ const NewQuote = () => {
                   )}
 
                   {/* Tipo — só exibe se não vier do catálogo */}
-                  {!itemUnits[item.id] && (
+                  {!item._catalogUnit && (
                     <Select value={item.type} onValueChange={(v: QuoteItemType) => updateItem(item.id, { type: v })}>
                       <SelectTrigger>
                         <SelectValue />
@@ -406,7 +405,7 @@ const NewQuote = () => {
                   )}
 
                   {/* Descrição: editável quando personalizado ou produto do catálogo */}
-                  {(item.type === "personalizado" || itemUnits[item.id]) && (
+                  {(item.type === "personalizado" || item._catalogUnit) && (
                     <Input
                       placeholder="Descreva o item..."
                       value={item.description}
@@ -425,7 +424,7 @@ const NewQuote = () => {
                   </div>
 
                   {/* Campos de dimensão: m² do catálogo OU item livre */}
-                  {(itemUnits[item.id] === 'm²' || !itemUnits[item.id]) && (
+                  {(item._catalogUnit === 'm²' || !item._catalogUnit) && (
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <Label className="text-xs">Largura (mm)</Label>
@@ -459,7 +458,7 @@ const NewQuote = () => {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs">
-                        {itemUnits[item.id] === 'm²' ? 'Peças' : 'Quantidade'}
+                        {item._catalogUnit === 'm²' ? 'Peças' : 'Quantidade'}
                       </Label>
                       <Input
                         className="mt-1"
@@ -472,7 +471,7 @@ const NewQuote = () => {
                     </div>
                     <div>
                       <Label className="text-xs">
-                        {itemUnits[item.id] ? `Preço / ${itemUnits[item.id]} (R$)` : 'Valor Unitário (R$)'}
+                        {item._catalogUnit ? `Preço / ${item._catalogUnit} (R$)` : 'Valor Unitário (R$)'}
                       </Label>
                       <Input
                         className="mt-1"
@@ -487,7 +486,7 @@ const NewQuote = () => {
                   </div>
 
                   {/* Preview de cálculo em tempo real */}
-                  {itemUnits[item.id] === 'm²' && item.width && item.height ? (
+                  {item._catalogUnit === 'm²' && item.width && item.height ? (
                     <div className="rounded-lg bg-primary/5 px-3 py-2 space-y-0.5">
                       <div className="flex justify-between text-xs text-muted-foreground">
                         <span>Área</span>
@@ -507,7 +506,7 @@ const NewQuote = () => {
                         </span>
                       </div>
                     </div>
-                  ) : (item.width && item.height && !itemUnits[item.id]) ? (
+                  ) : (item.width && item.height && !item._catalogUnit) ? (
                     <div className="text-xs text-muted-foreground">
                       Área: {(item.width * item.height / 1_000_000 * item.quantity).toFixed(4)} m²
                     </div>
