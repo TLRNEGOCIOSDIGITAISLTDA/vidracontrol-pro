@@ -485,11 +485,11 @@ const NewQuote = () => {
                     </div>
                   </div>
 
-                  {/* Preview de cálculo em tempo real */}
-                  {item._catalogUnit === 'm²' && item.width && item.height ? (
+                  {/* Metragem — aparece sempre que largura e altura estão preenchidas */}
+                  {item.width && item.height ? (
                     <div className="rounded-lg bg-primary/5 px-3 py-2 space-y-0.5">
                       <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Área</span>
+                        <span>Metragem</span>
                         <span className="font-medium text-foreground">
                           {(item.width * item.height / 10_000 * item.quantity).toFixed(4)} m²
                           {item.quantity > 1 && (
@@ -499,16 +499,14 @@ const NewQuote = () => {
                           )}
                         </span>
                       </div>
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Cálculo</span>
-                        <span>
-                          {(item.width * item.height / 10_000 * item.quantity).toFixed(4)} m² × {fmt(item.unitPrice)}/m²
-                        </span>
-                      </div>
-                    </div>
-                  ) : (item.width && item.height && !item._catalogUnit) ? (
-                    <div className="text-xs text-muted-foreground">
-                      Área: {(item.width * item.height / 10_000 * item.quantity).toFixed(4)} m²
+                      {item._catalogUnit === 'm²' && (
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>Cálculo</span>
+                          <span>
+                            {(item.width * item.height / 10_000 * item.quantity).toFixed(4)} m² × {fmt(item.unitPrice)}/m²
+                          </span>
+                        </div>
+                      )}
                     </div>
                   ) : null}
 
