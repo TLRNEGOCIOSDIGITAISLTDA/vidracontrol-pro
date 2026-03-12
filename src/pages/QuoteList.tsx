@@ -144,12 +144,14 @@ function KanbanColumn({
   color,
   quotes,
   onStatusChange,
+  novoId,
 }: {
   status: QuoteStatus;
   label: string;
   color: string;
   quotes: Quote[];
   onStatusChange: (id: string, status: QuoteStatus) => Promise<void>;
+  novoId?: string | null;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -419,6 +421,7 @@ const QuoteList = () => {
                     color={group.color}
                     quotes={group.quotes}
                     onStatusChange={handleStatusChange}
+                    novoId={novoId}
                   />
                 ))}
               </div>
