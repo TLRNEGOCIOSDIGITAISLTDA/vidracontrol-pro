@@ -105,7 +105,7 @@ const QuoteDetail = () => {
       // Update status to 'enviado'
       await changeQuoteStatus(id, 'enviado');
       toast.success('Orçamento enviado! Status alterado para "Enviado".');
-      navigate('/app');
+      navigate('/app/orcamentos');
     } catch (err) {
       toast.error("Erro ao enviar orçamento.");
     } finally {
@@ -292,9 +292,9 @@ const QuoteDetail = () => {
                         <div className="font-bold">{item.description}</div>
                         {(item.width || item.height) && (
                           <div className="text-xs text-[hsl(215,10%,45%)]">
-                            {item.width ? `${item.width}mm` : '—'} × {item.height ? `${item.height}mm` : '—'}
+                            {item.width ? `${item.width}cm` : '—'} × {item.height ? `${item.height}cm` : '—'}
                             {item.width && item.height && (
-                              <span className="ml-1">({(item.width * item.height / 1_000_000).toFixed(4)}m²)</span>
+                              <span className="ml-1">({(item.width * item.height / 10_000).toFixed(4)}m²)</span>
                             )}
                           </div>
                         )}

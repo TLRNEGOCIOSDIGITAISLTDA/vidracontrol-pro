@@ -220,7 +220,7 @@ const NewQuote = () => {
       nfPercent: nfRequired && nfPercent > 0 ? nfPercent : undefined,
     });
     toast.success("Orçamento criado!");
-    navigate(`/app/orcamento/${quote.id}`);
+    navigate(`/app/orcamentos?novo=${quote.id}`);
   };
 
   return (

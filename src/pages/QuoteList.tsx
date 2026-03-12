@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Plus, FileText, LayoutGrid, List, CheckCircle2, XCircle, Send } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { Plus, FileText, LayoutGrid, List, CheckCircle2, XCircle, Send, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { useData } from "@/lib/DataContext";
@@ -37,9 +37,11 @@ function triggerWhatsApp(quote: Quote) {
 function KanbanCard({
   quote,
   onStatusChange,
+  isNew,
 }: {
   quote: Quote;
   onStatusChange: (id: string, status: QuoteStatus) => Promise<void>;
+  isNew?: boolean;
 }) {
   const status = (quote.status || "orcado") as QuoteStatus;
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -53,81 +55,84 @@ function KanbanCard({
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 999 }
     : undefined;
 
-  const showWA = status === "orcado";
-  const showAprovar = status === "enviado" || status === "aguardando";
-  const showPerdido = status === "enviado" || status === "aguardando";
+  const showWA = status === "orcado" || status === "enviado";
+  const showAprovar = status !== "aprovado" && status !== "perdido";
+  const showPerdido = status !== "aprovado" && status !== "perdido";
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`bg-card rounded-xl border border-border/50 select-none transition-shadow ${
+      className={`bg-card rounded-xl border select-none transition-shadow ${
         isDragging ? "opacity-40 shadow-sm" : "shadow-card"
-      }`}
+      } ${isNew ? "border-primary/60 ring-2 ring-primary/30" : "border-border/50"}`}
     >
-      {/* Card body — clickable + draggable */}
-      <Link
-        to={`/app/orcamento/${quote.id}`}
-        className="block p-3"
-        onClick={(e) => isDragging && e.preventDefault()}
+      {/* Card body — draggable */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing p-3"
       >
-        <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
-          <div className="flex items-start justify-between gap-2 mb-1">
-            <h3 className="font-bold text-foreground text-sm leading-tight">{quote.clientName}</h3>
-            <span className="font-bold text-primary text-sm whitespace-nowrap">{fmt(quote.total)}</span>
-          </div>
-          {quote.jobType && (
-            <p className="text-xs text-muted-foreground mb-1 truncate">{quote.jobType}</p>
-          )}
-          <p className="text-[10px] text-muted-foreground">
-            {new Date(quote.createdAt).toLocaleDateString("pt-BR")} ·{" "}
-            {quote.items.length} {quote.items.length === 1 ? "item" : "itens"}
-          </p>
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <h3 className="font-bold text-foreground text-sm leading-tight">{quote.clientName}</h3>
+          <span className="font-bold text-primary text-sm whitespace-nowrap">{fmt(quote.total)}</span>
         </div>
-      </Link>
+        {quote.jobType && (
+          <p className="text-xs text-muted-foreground mb-1 truncate">{quote.jobType}</p>
+        )}
+        <p className="text-[10px] text-muted-foreground">
+          {new Date(quote.createdAt).toLocaleDateString("pt-BR")} ·{" "}
+          {quote.items.length} {quote.items.length === 1 ? "item" : "itens"}
+        </p>
+      </div>
 
       {/* Quick actions */}
-      {(showWA || showAprovar || showPerdido) && (
-        <div className="flex gap-1 px-2 pb-2.5 flex-wrap border-t border-border/40 pt-1.5">
-          {showWA && (
-            <button
-              onClick={async (e) => {
-                e.preventDefault();
-                await onStatusChange(quote.id, "enviado");
-                triggerWhatsApp(quote);
-                toast.success("Enviado! WhatsApp aberto.");
-              }}
-              className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md bg-[hsl(215,80%,55%)]/10 text-[hsl(215,80%,45%)] hover:bg-[hsl(215,80%,55%)]/20 transition-colors"
-            >
-              <Send className="h-2.5 w-2.5" /> Enviar WA
-            </button>
-          )}
-          {showAprovar && (
-            <button
-              onClick={async (e) => {
-                e.preventDefault();
-                await onStatusChange(quote.id, "aprovado");
-                toast.success("Aprovado! Obra criada. 🎉");
-              }}
-              className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md bg-success/10 text-success hover:bg-success/20 transition-colors"
-            >
-              <CheckCircle2 className="h-2.5 w-2.5" /> Aprovar
-            </button>
-          )}
-          {showPerdido && (
-            <button
-              onClick={async (e) => {
-                e.preventDefault();
-                await onStatusChange(quote.id, "perdido");
-                toast("Marcado como Perdido.");
-              }}
-              className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
-            >
-              <XCircle className="h-2.5 w-2.5" /> Perdido
-            </button>
-          )}
-        </div>
-      )}
+      <div className="flex gap-1 px-2 pb-2.5 flex-wrap border-t border-border/40 pt-1.5">
+        <Link
+          to={`/app/orcamento/${quote.id}`}
+          className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+          onClick={(e) => isDragging && e.preventDefault()}
+        >
+          <Eye className="h-2.5 w-2.5" /> Ver
+        </Link>
+        {showWA && (
+          <button
+            onClick={async (e) => {
+              e.preventDefault();
+              await onStatusChange(quote.id, "enviado");
+              triggerWhatsApp(quote);
+              toast.success("Enviado! WhatsApp aberto.");
+            }}
+            className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md bg-[hsl(215,80%,55%)]/10 text-[hsl(215,80%,45%)] hover:bg-[hsl(215,80%,55%)]/20 transition-colors"
+          >
+            <Send className="h-2.5 w-2.5" /> Enviar WA
+          </button>
+        )}
+        {showAprovar && (
+          <button
+            onClick={async (e) => {
+              e.preventDefault();
+              await onStatusChange(quote.id, "aprovado");
+              toast.success("Aprovado! Obra criada. 🎉");
+            }}
+            className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md bg-success/10 text-success hover:bg-success/20 transition-colors"
+          >
+            <CheckCircle2 className="h-2.5 w-2.5" /> Aprovar
+          </button>
+        )}
+        {showPerdido && (
+          <button
+            onClick={async (e) => {
+              e.preventDefault();
+              await onStatusChange(quote.id, "perdido");
+              toast("Marcado como Perdido.");
+            }}
+            className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+          >
+            <XCircle className="h-2.5 w-2.5" /> Perdido
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -174,7 +179,7 @@ function KanbanColumn({
         }`}
       >
         {quotes.map((q) => (
-          <KanbanCard key={q.id} quote={q} onStatusChange={onStatusChange} />
+          <KanbanCard key={q.id} quote={q} onStatusChange={onStatusChange} isNew={q.id === novoId} />
         ))}
         {quotes.length === 0 && (
           <div className="flex items-center justify-center h-20 text-[11px] text-muted-foreground/40 text-center pointer-events-none">
@@ -189,6 +194,8 @@ function KanbanColumn({
 // ===== MAIN =====
 const QuoteList = () => {
   const { quotes, changeQuoteStatus } = useData();
+  const [searchParams] = useSearchParams();
+  const novoId = searchParams.get("novo");
   const [view, setView] = useState<"kanban" | "list">(
     () => (localStorage.getItem("quoteView") as "kanban" | "list") || "kanban"
   );
@@ -440,11 +447,6 @@ const QuoteList = () => {
             {quotesByStatus
               .filter((g) => g.count > 0)
               .map((group) => {
-                const showWA = group.status === "orcado";
-                const showAprovar = group.status === "enviado" || group.status === "aguardando";
-                const showPerdido = group.status === "enviado" || group.status === "aguardando";
-                const showActions = showWA || showAprovar || showPerdido;
-
                 return (
                   <div key={group.status}>
                     <div className="flex items-center gap-2 mb-2">
@@ -458,17 +460,25 @@ const QuoteList = () => {
                       <span className="text-xs text-muted-foreground">— {fmt(group.total)}</span>
                     </div>
                     <div className="space-y-2">
-                      {group.quotes.map((q, i) => (
+                      {group.quotes.map((q, i) => {
+                        const qStatus = (q.status || "orcado") as QuoteStatus;
+                        const qShowWA = qStatus === "orcado" || qStatus === "enviado";
+                        const qShowAprovar = qStatus !== "aprovado" && qStatus !== "perdido";
+                        const qShowPerdido = qStatus !== "aprovado" && qStatus !== "perdido";
+                        const isNovo = q.id === novoId;
+                        return (
                         <motion.div
                           key={q.id}
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: i * 0.03 }}
                         >
-                          <div className="bg-card rounded-xl shadow-card hover:shadow-elevated transition-shadow">
-                            <Link to={`/app/orcamento/${q.id}`} className="block p-4">
+                          <div className={`bg-card rounded-xl shadow-card hover:shadow-elevated transition-shadow ${isNovo ? "ring-2 ring-primary/40 border border-primary/40" : ""}`}>
+                            <div className="p-4">
                               <div className="flex items-center justify-between mb-1">
-                                <h3 className="font-bold text-foreground truncate">{q.clientName}</h3>
+                                <Link to={`/app/orcamento/${q.id}`} className="font-bold text-foreground truncate hover:text-primary transition-colors">
+                                  {q.clientName}
+                                </Link>
                                 <span
                                   className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
                                     QUOTE_STATUS_BG[group.status]
@@ -487,51 +497,56 @@ const QuoteList = () => {
                                 </span>
                                 <span className="font-bold text-primary">{fmt(q.total)}</span>
                               </div>
-                            </Link>
-                            {showActions && (
-                              <div className="flex gap-2 px-4 pb-3 border-t border-border/50 pt-2 flex-wrap">
-                                {showWA && (
-                                  <button
-                                    onClick={async (e) => {
-                                      e.preventDefault();
-                                      await handleStatusChange(q.id, "enviado");
-                                      triggerWhatsApp(q);
-                                      toast.success("Enviado! WhatsApp aberto.");
-                                    }}
-                                    className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-[hsl(215,80%,55%)]/10 text-[hsl(215,80%,45%)] hover:bg-[hsl(215,80%,55%)]/20 transition-colors"
-                                  >
-                                    <Send className="h-3 w-3" /> Enviar WA
-                                  </button>
-                                )}
-                                {showAprovar && (
-                                  <button
-                                    onClick={async (e) => {
-                                      e.preventDefault();
-                                      await handleStatusChange(q.id, "aprovado");
-                                      toast.success("Aprovado! Obra criada. 🎉");
-                                    }}
-                                    className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors"
-                                  >
-                                    <CheckCircle2 className="h-3 w-3" /> Aprovar
-                                  </button>
-                                )}
-                                {showPerdido && (
-                                  <button
-                                    onClick={async (e) => {
-                                      e.preventDefault();
-                                      await handleStatusChange(q.id, "perdido");
-                                      toast("Marcado como Perdido.");
-                                    }}
-                                    className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
-                                  >
-                                    <XCircle className="h-3 w-3" /> Perdido
-                                  </button>
-                                )}
-                              </div>
-                            )}
+                            </div>
+                            <div className="flex gap-2 px-4 pb-3 border-t border-border/50 pt-2 flex-wrap">
+                              <Link
+                                to={`/app/orcamento/${q.id}`}
+                                className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+                              >
+                                <Eye className="h-3 w-3" /> Ver Orçamento
+                              </Link>
+                              {qShowWA && (
+                                <button
+                                  onClick={async (e) => {
+                                    e.preventDefault();
+                                    await handleStatusChange(q.id, "enviado");
+                                    triggerWhatsApp(q);
+                                    toast.success("Enviado! WhatsApp aberto.");
+                                  }}
+                                  className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-[hsl(215,80%,55%)]/10 text-[hsl(215,80%,45%)] hover:bg-[hsl(215,80%,55%)]/20 transition-colors"
+                                >
+                                  <Send className="h-3 w-3" /> Enviar WA
+                                </button>
+                              )}
+                              {qShowAprovar && (
+                                <button
+                                  onClick={async (e) => {
+                                    e.preventDefault();
+                                    await handleStatusChange(q.id, "aprovado");
+                                    toast.success("Aprovado! Obra criada. 🎉");
+                                  }}
+                                  className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors"
+                                >
+                                  <CheckCircle2 className="h-3 w-3" /> Aprovar
+                                </button>
+                              )}
+                              {qShowPerdido && (
+                                <button
+                                  onClick={async (e) => {
+                                    e.preventDefault();
+                                    await handleStatusChange(q.id, "perdido");
+                                    toast("Marcado como Perdido.");
+                                  }}
+                                  className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+                                >
+                                  <XCircle className="h-3 w-3" /> Perdido
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </motion.div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 );
