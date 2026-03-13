@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Plus, FileText, LayoutGrid, List, CheckCircle2, XCircle, Send, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -192,7 +192,11 @@ function KanbanColumn({
 
 // ===== MAIN =====
 const QuoteList = () => {
-  const { quotes, changeQuoteStatus } = useData();
+  const { quotes, changeQuoteStatus, refreshQuotes } = useData();
+
+  useEffect(() => {
+    refreshQuotes();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [searchParams] = useSearchParams();
   const novoId = searchParams.get("novo");
   const [view, setView] = useState<"kanban" | "list">(
