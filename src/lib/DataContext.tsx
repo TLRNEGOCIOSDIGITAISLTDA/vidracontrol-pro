@@ -10,6 +10,7 @@ import {
   deleteJob as storageDeleteJob,
   deleteQuote as storageDeleteQuote,
   saveQuoteStatus,
+  updateQuote as storageUpdateQuote,
 } from "./storage";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -23,6 +24,7 @@ interface DataContextType {
   addCost: (quoteId: string, cost: Parameters<typeof storageSaveCost>[1]) => Promise<Awaited<ReturnType<typeof storageSaveCost>>>;
   removeCost: (quoteId: string, costId: string) => Promise<void>;
   changeQuoteStatus: (quoteId: string, newStatus: QuoteStatus) => Promise<void>;
+  updateQuote: (quote: Quote) => Promise<void>;
   removeJob: (jobId: string) => Promise<void>;
   removeQuote: (quoteId: string) => Promise<void>;
   lastUpdate: number;
@@ -126,6 +128,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await refreshQuotes();
   }, [quotes, refreshJobs, refreshQuotes]); // `quotes` still needed to get item data for job creation
 
+  const updateQuote = useCallback(async (quote: Quote) => {
+    await storageUpdateQuote(quote);
+    await refreshQuotes();
+  }, [refreshQuotes]);
+
   const removeJob = useCallback(async (jobId: string) => {
     await storageDeleteJob(jobId);
     await refreshAll();
@@ -137,7 +144,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [refreshAll]);
 
   return (
-    <DataContext.Provider value={{ jobs, quotes, loading, refreshAll, refreshQuotes, refreshJobs, addCost, removeCost, changeQuoteStatus, removeJob, removeQuote, lastUpdate }}>
+    <DataContext.Provider value={{ jobs, quotes, loading, refreshAll, refreshQuotes, refreshJobs, addCost, removeCost, changeQuoteStatus, updateQuote, removeJob, removeQuote, lastUpdate }}>
       {children}
     </DataContext.Provider>
   );

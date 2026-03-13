@@ -420,6 +420,41 @@ export async function deleteProduct(id: string): Promise<void> {
   await logAudit('delete', 'product', id);
 }
 
+export async function updateQuote(quote: Quote): Promise<void> {
+  const uid = await getUserId();
+  await supabase.from('quotes').update({
+    client_name: quote.clientName,
+    client_phone: quote.clientPhone || '',
+    job_type: quote.jobType || null,
+    total: quote.total,
+    notes: quote.notes || null,
+    company_info: {
+      ...quote.companyInfo,
+      ...(quote.commission ? { _commission: quote.commission } : {}),
+      ...(quote.nfPercent ? { _nfPct: quote.nfPercent } : {}),
+    } as any,
+  }).eq('id', quote.id);
+
+  await supabase.from('quote_items').delete().eq('quote_id', quote.id);
+  if (quote.items.length > 0) {
+    await supabase.from('quote_items').insert(
+      quote.items.map(i => ({
+        quote_id: quote.id,
+        type: i.type,
+        description: i.description,
+        location: i.location || null,
+        width: i.width || null,
+        height: i.height || null,
+        quantity: i.quantity,
+        unit_price: i.unitPrice,
+        total: i.total,
+        user_id: uid,
+      }))
+    );
+  }
+  await logAudit('update', 'quote', quote.id, { clientName: quote.clientName });
+}
+
 // ---- Clear all data ----
 export async function clearAllData() {
   const uid = await getUserId();

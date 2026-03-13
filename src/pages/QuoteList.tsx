@@ -21,6 +21,7 @@ import {
 } from "@dnd-kit/core";
 
 const ALL_STATUSES: QuoteStatus[] = ["orcado", "enviado", "aguardando", "aprovado", "perdido"];
+const KANBAN_STATUSES: QuoteStatus[] = ["orcado", "enviado", "aprovado", "perdido"];
 
 function triggerWhatsApp(quote: Quote) {
   const phone = quote.clientPhone?.replace(/\D/g, "");
@@ -93,7 +94,7 @@ function KanbanCard({
           className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
           onClick={(e) => isDragging && e.preventDefault()}
         >
-          <Eye className="h-2.5 w-2.5" /> Ver
+          <Eye className="h-2.5 w-2.5" /> Ver + Editar
         </Link>
         {showWA && (
           <button
@@ -113,7 +114,7 @@ function KanbanCard({
             onClick={async (e) => {
               e.preventDefault();
               await onStatusChange(quote.id, "aprovado");
-              toast.success("Aprovado! Obra criada. 🎉");
+              toast.success("Obra criada com sucesso!");
             }}
             className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md bg-success/10 text-success hover:bg-success/20 transition-colors"
           >
@@ -160,16 +161,12 @@ function KanbanColumn({
   return (
     <div className="flex flex-col w-[220px] flex-shrink-0">
       {/* Header */}
-      <div className="flex items-center gap-2 mb-1.5 px-1">
+      <div className="flex items-center gap-1.5 mb-2 px-1">
         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-        <span className="text-xs font-bold text-foreground leading-tight flex-1">{label}</span>
-        <span className="bg-muted text-muted-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-          {quotes.length}
-        </span>
+        <p className="text-xs font-bold text-foreground leading-tight flex-1 min-w-0 truncate">
+          {label} ({quotes.length}){quotes.length > 0 ? ` — ${fmt(total)}` : ""}
+        </p>
       </div>
-      {quotes.length > 0 && (
-        <p className="text-[10px] text-muted-foreground px-1 mb-2">{fmt(total)}</p>
-      )}
 
       {/* Drop zone */}
       <div
@@ -238,7 +235,7 @@ const QuoteList = () => {
       triggerWhatsApp(quote);
       toast.success('Status: Enviado. WhatsApp aberto!');
     } else if (newStatus === "aprovado") {
-      toast.success("Aprovado! Obra criada automaticamente. 🎉");
+      toast.success("Obra criada com sucesso!");
     } else if (newStatus === "perdido") {
       toast("Marcado como Perdido.");
     } else {
@@ -246,8 +243,26 @@ const QuoteList = () => {
     }
   };
 
+  // Lista completa para a view de lista
   const quotesByStatus = ALL_STATUSES.map((status) => {
     const filtered = quotes.filter((q) => (q.status || "orcado") === status);
+    return {
+      status,
+      label: QUOTE_STATUS_LABELS[status],
+      color: QUOTE_STATUS_COLORS[status],
+      count: filtered.length,
+      total: filtered.reduce((s, q) => s + q.total, 0),
+      quotes: filtered,
+    };
+  });
+
+  // Kanban usa 4 colunas; "aguardando" aparece em "enviado"
+  const kanbanByStatus = KANBAN_STATUSES.map((status) => {
+    const filtered = quotes.filter((q) => {
+      const s = (q.status || "orcado") as QuoteStatus;
+      if (status === "enviado") return s === "enviado" || s === "aguardando";
+      return s === status;
+    });
     return {
       status,
       label: QUOTE_STATUS_LABELS[status],
@@ -413,7 +428,7 @@ const QuoteList = () => {
             {/* Board — horizontal scroll */}
             <div className="overflow-x-auto pb-4 -mx-4 px-4">
               <div className="flex gap-3" style={{ minWidth: "max-content" }}>
-                {quotesByStatus.map((group) => (
+                {kanbanByStatus.map((group) => (
                   <KanbanColumn
                     key={group.status}
                     status={group.status}
@@ -506,7 +521,7 @@ const QuoteList = () => {
                                 to={`/app/orcamento/${q.id}`}
                                 className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
                               >
-                                <Eye className="h-3 w-3" /> Ver Orçamento
+                                <Eye className="h-3 w-3" /> Ver + Editar
                               </Link>
                               {qShowWA && (
                                 <button
@@ -526,7 +541,7 @@ const QuoteList = () => {
                                   onClick={async (e) => {
                                     e.preventDefault();
                                     await handleStatusChange(q.id, "aprovado");
-                                    toast.success("Aprovado! Obra criada. 🎉");
+                                    toast.success("Obra criada com sucesso!");
                                   }}
                                   className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors"
                                 >
