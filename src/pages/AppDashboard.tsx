@@ -1,17 +1,24 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronDown, Trash2, Percent, CalendarDays } from "lucide-react";
+import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronDown, Trash2, Percent, CalendarDays, LayoutGrid, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { useData } from "@/lib/DataContext";
 import { clearAllData } from "@/lib/storage";
-import { QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS, JOB_STATUS_LABELS, JOB_STATUS_COLORS, JobStatus } from "@/lib/types";
+import { QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS, QUOTE_STATUS_BG, JOB_STATUS_LABELS, JOB_STATUS_COLORS, JobStatus } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { toast } from "sonner";
 import { QuoteKanban } from "@/components/app/QuoteKanban";
 
 const ALL_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'aprovado', 'perdido'];
+const ALL_JOB_STATUSES: JobStatus[] = ['a_iniciar', 'em_andamento', 'aguardando_pagamento', 'concluido'];
+const JOB_STATUS_HEX: Record<JobStatus, string> = {
+  a_iniciar: '#94a3b8',
+  em_andamento: 'hsl(215,80%,55%)',
+  aguardando_pagamento: '#f59e0b',
+  concluido: '#22c55e',
+};
 
 const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -70,6 +77,12 @@ const AppDashboard = () => {
   const [quotesOpen, setQuotesOpen] = useState(false);
   const [jobsOpen, setJobsOpen] = useState(false);
   const [monthlyOpen, setMonthlyOpen] = useState(false);
+  const [quotesView, setQuotesView] = useState<"kanban" | "list">(
+    () => (localStorage.getItem("dashQuotesView") as "kanban" | "list") || "kanban"
+  );
+  const [jobsView, setJobsView] = useState<"kanban" | "list">(
+    () => (localStorage.getItem("dashJobsView") as "kanban" | "list") || "list"
+  );
 
   // Monthly breakdown from jobs (uses real expenses per job)
   const monthlyData = useMemo(() => {
@@ -275,6 +288,23 @@ const AppDashboard = () => {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-foreground">Orçamentos</h2>
             <div className="flex items-center gap-2">
+              {/* Toggle kanban/lista */}
+              <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
+                <button
+                  onClick={() => { setQuotesView("kanban"); localStorage.setItem("dashQuotesView", "kanban"); }}
+                  title="Kanban"
+                  className={`p-1.5 rounded-md transition-colors ${quotesView === "kanban" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => { setQuotesView("list"); localStorage.setItem("dashQuotesView", "list"); }}
+                  title="Lista"
+                  className={`p-1.5 rounded-md transition-colors ${quotesView === "list" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <List className="h-4 w-4" />
+                </button>
+              </div>
               <Button size="sm" variant="outline" onClick={() => setQuotesOpen(!quotesOpen)} className="gap-1">
                 Ver todos
                 <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${quotesOpen ? "rotate-180" : ""}`} />
@@ -299,8 +329,42 @@ const AppDashboard = () => {
                       <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
                       <p className="text-muted-foreground">Nenhum orçamento ainda.</p>
                     </div>
-                  ) : (
+                  ) : quotesView === "kanban" ? (
                     <QuoteKanban />
+                  ) : (
+                    /* Vista lista — agrupada por status */
+                    <div className="space-y-4">
+                      {quotesByStatus.filter(g => g.count > 0).map((group) => (
+                        <div key={group.status}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.color }} />
+                            <span className="text-sm font-bold text-foreground">{group.label} ({group.count})</span>
+                            <span className="text-xs text-muted-foreground">— {fmt(group.total)}</span>
+                          </div>
+                          <div className="space-y-2">
+                            {group.quotes.map((quote, i) => (
+                              <motion.div key={quote.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
+                                <Link to={`/app/orcamento/${quote.id}`}>
+                                  <div className="bg-card rounded-xl shadow-card hover:shadow-elevated transition-shadow p-4">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <h3 className="font-bold text-foreground truncate">{quote.clientName}</h3>
+                                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${QUOTE_STATUS_BG[group.status]}`}>{group.label}</span>
+                                    </div>
+                                    {quote.jobType && <p className="text-sm text-muted-foreground truncate mb-1">{quote.jobType}</p>}
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs text-muted-foreground">
+                                        {new Date(quote.createdAt).toLocaleDateString("pt-BR")} · {quote.items.length} {quote.items.length === 1 ? "item" : "itens"}
+                                      </span>
+                                      <span className="font-bold text-primary text-sm">{fmt(quote.total)}</span>
+                                    </div>
+                                  </div>
+                                </Link>
+                              </motion.div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               </motion.div>
@@ -313,6 +377,23 @@ const AppDashboard = () => {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-foreground">Minhas Obras</h2>
             <div className="flex items-center gap-2">
+              {/* Toggle kanban/lista */}
+              <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
+                <button
+                  onClick={() => { setJobsView("kanban"); localStorage.setItem("dashJobsView", "kanban"); }}
+                  title="Kanban"
+                  className={`p-1.5 rounded-md transition-colors ${jobsView === "kanban" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => { setJobsView("list"); localStorage.setItem("dashJobsView", "list"); }}
+                  title="Lista"
+                  className={`p-1.5 rounded-md transition-colors ${jobsView === "list" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <List className="h-4 w-4" />
+                </button>
+              </div>
               <Button size="sm" variant="outline" onClick={() => setJobsOpen(!jobsOpen)} className="gap-1">
                 Ver todos
                 <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${jobsOpen ? "rotate-180" : ""}`} />
@@ -322,41 +403,100 @@ const AppDashboard = () => {
               </Link>
             </div>
           </div>
-          <div className="overflow-hidden transition-all duration-300 ease-out" style={{ maxHeight: jobsOpen ? `${jobs.length * 140 + 100}px` : "0px", opacity: jobsOpen ? 1 : 0 }}>
-            <div className="pt-3 space-y-3">
-              {jobs.length === 0 ? (
-                <div className="text-center py-10">
-                  <Briefcase className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
-                  <p className="text-muted-foreground">Nenhuma obra ainda.</p>
-                  <p className="text-muted-foreground text-sm">Clique em "Nova Obra" para começar!</p>
-                </div>
-              ) : (
-                jobs.map((job, i) => {
-                  const expenses = job.expenses.reduce((s, e) => s + e.value, 0);
-                  const profit = job.saleValue - expenses;
-                  return (
-                    <motion.div key={job.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-                      <Link to={`/app/obra/${job.id}`}>
-                        <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow">
-                          <div className="flex items-center justify-between mb-2">
-                            <h3 className="font-bold text-foreground truncate">{job.clientName}</h3>
-                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${JOB_STATUS_COLORS[(job.status as JobStatus) || 'em_andamento']}`}>
-                              {JOB_STATUS_LABELS[(job.status as JobStatus) || 'em_andamento']}
-                            </span>
-                          </div>
-                          <p className="text-sm text-muted-foreground truncate mb-3">{job.description}</p>
-                          <div className="flex items-center gap-4 text-sm">
-                            <span className="text-muted-foreground">Venda: <strong className="text-foreground">{fmt(job.saleValue)}</strong></span>
-                            <span className="text-muted-foreground">Lucro: <strong className={profit >= 0 ? "text-success" : "text-destructive"}>{fmt(profit)}</strong></span>
-                          </div>
+          <AnimatePresence>
+            {jobsOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                <div className="pt-4">
+                  {jobs.length === 0 ? (
+                    <div className="text-center py-10">
+                      <Briefcase className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
+                      <p className="text-muted-foreground">Nenhuma obra ainda.</p>
+                      <p className="text-muted-foreground text-sm">Clique em "Nova Obra" para começar!</p>
+                    </div>
+                  ) : jobsView === "kanban" ? (
+                    /* Vista kanban — colunas por status */
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-3">Obras agrupadas por status.</p>
+                      <div className="overflow-x-auto pb-4 -mx-4 px-4">
+                        <div className="flex gap-3" style={{ minWidth: "max-content" }}>
+                          {ALL_JOB_STATUSES.map((status) => {
+                            const colJobs = jobs.filter(j => (j.status as JobStatus || 'em_andamento') === status);
+                            const colTotal = colJobs.reduce((s, j) => s + j.saleValue, 0);
+                            return (
+                              <div key={status} className="flex flex-col w-[220px] flex-shrink-0">
+                                <div className="flex items-center gap-1.5 mb-2 px-1">
+                                  <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: JOB_STATUS_HEX[status] }} />
+                                  <p className="text-xs font-bold text-foreground leading-tight flex-1 min-w-0 truncate">
+                                    {JOB_STATUS_LABELS[status]} ({colJobs.length}){colJobs.length > 0 ? ` — ${fmt(colTotal)}` : ""}
+                                  </p>
+                                </div>
+                                <div className="rounded-xl p-2 space-y-2 min-h-[140px] bg-muted/40">
+                                  {colJobs.map((job) => {
+                                    const expenses = job.expenses.reduce((s, e) => s + e.value, 0);
+                                    const profit = job.saleValue - expenses;
+                                    return (
+                                      <Link key={job.id} to={`/app/obra/${job.id}`}>
+                                        <div className="bg-card rounded-xl border border-border/50 shadow-card hover:shadow-elevated transition-shadow p-3 mb-2">
+                                          <h3 className="font-bold text-foreground text-sm leading-tight truncate mb-1">{job.clientName}</h3>
+                                          {job.description && <p className="text-xs text-muted-foreground truncate mb-1">{job.description}</p>}
+                                          <div className="flex items-center justify-between">
+                                            <span className="text-[10px] text-muted-foreground">Lucro:</span>
+                                            <span className={`text-xs font-bold ${profit >= 0 ? "text-success" : "text-destructive"}`}>{fmt(profit)}</span>
+                                          </div>
+                                        </div>
+                                      </Link>
+                                    );
+                                  })}
+                                  {colJobs.length === 0 && (
+                                    <div className="flex items-center justify-center h-20 text-[11px] text-muted-foreground/40 text-center">
+                                      Sem obras
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      </Link>
-                    </motion.div>
-                  );
-                })
-              )}
-            </div>
-          </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Vista lista */
+                    <div className="space-y-3">
+                      {jobs.map((job, i) => {
+                        const expenses = job.expenses.reduce((s, e) => s + e.value, 0);
+                        const profit = job.saleValue - expenses;
+                        return (
+                          <motion.div key={job.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+                            <Link to={`/app/obra/${job.id}`}>
+                              <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h3 className="font-bold text-foreground truncate">{job.clientName}</h3>
+                                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${JOB_STATUS_COLORS[(job.status as JobStatus) || 'em_andamento']}`}>
+                                    {JOB_STATUS_LABELS[(job.status as JobStatus) || 'em_andamento']}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-muted-foreground truncate mb-3">{job.description}</p>
+                                <div className="flex items-center gap-4 text-sm">
+                                  <span className="text-muted-foreground">Venda: <strong className="text-foreground">{fmt(job.saleValue)}</strong></span>
+                                  <span className="text-muted-foreground">Lucro: <strong className={profit >= 0 ? "text-success" : "text-destructive"}>{fmt(profit)}</strong></span>
+                                </div>
+                              </div>
+                            </Link>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
         {/* Reset button */}
         <div className="text-center pt-4 pb-8">
