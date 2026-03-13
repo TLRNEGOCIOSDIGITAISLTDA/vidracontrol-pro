@@ -1,25 +1,17 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronDown, Trash2, Percent, CalendarDays, Send, CheckCircle2, XCircle } from "lucide-react";
+import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronDown, Trash2, Percent, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { useData } from "@/lib/DataContext";
 import { clearAllData } from "@/lib/storage";
-import { QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS, QUOTE_STATUS_BG, JOB_STATUS_LABELS, JOB_STATUS_COLORS, JobStatus } from "@/lib/types";
+import { QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS, JOB_STATUS_LABELS, JOB_STATUS_COLORS, JobStatus } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { toast } from "sonner";
-
-function triggerWhatsApp(quote: { clientPhone?: string; clientName: string; id: string }) {
-  const phone = quote.clientPhone?.replace(/\D/g, '');
-  if (!phone || phone.length !== 11) { toast.error("Telefone do cliente não cadastrado."); return; }
-  const appUrl = `${window.location.origin}/orcamento-publico/${quote.id}`;
-  const msg = `Olá ${quote.clientName}! Segue o orçamento: ${appUrl}\n\nQualquer dúvida estou à disposição!`;
-  window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
-}
+import { QuoteKanban } from "@/components/app/QuoteKanban";
 
 const ALL_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'aprovado', 'perdido'];
-const ACTIVE_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'perdido'];
 
 const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -45,12 +37,11 @@ const HighlightCard = ({ children, className = "", lastUpdate }: { children: Rea
 };
 
 const AppDashboard = () => {
-  const { jobs, quotes, refreshAll, lastUpdate, changeQuoteStatus } = useData();
+  const { jobs, quotes, refreshAll, lastUpdate } = useData();
 
   useEffect(() => { refreshAll(); }, [refreshAll]);
 
   // Sales/Costs/Profit from jobs (expenses registered inside each job)
-  const closedQuotes = quotes.filter(q => q.status === "aprovado");
   const totalSales = jobs.reduce((s, j) => s + j.saleValue, 0);
   const totalCosts = jobs.reduce((s, j) => s + j.expenses.reduce((es, e) => es + e.value, 0), 0);
   const totalProfit = totalSales - totalCosts;
@@ -74,19 +65,6 @@ const AppDashboard = () => {
 
   const qtyData = quotesByStatus.filter(d => d.count > 0).map(d => ({ name: d.label, value: d.count, color: d.color }));
   const valueData = quotesByStatus.filter(d => d.total > 0).map(d => ({ name: d.label, value: d.total, color: d.color }));
-
-  // All quotes grouped by status for the Orçamentos accordion
-  const activeByStatus = ALL_STATUSES.map((status) => {
-    const filtered = quotes.filter((q) => (q.status || "orcado") === status);
-    return {
-      status,
-      label: QUOTE_STATUS_LABELS[status],
-      color: QUOTE_STATUS_COLORS[status],
-      count: filtered.length,
-      total: filtered.reduce((s, q) => s + q.total, 0),
-      quotes: filtered,
-    };
-  });
 
   const hasQuotes = quotes.length > 0;
   const [quotesOpen, setQuotesOpen] = useState(false);
@@ -306,70 +284,28 @@ const AppDashboard = () => {
               </Link>
             </div>
           </div>
-          <div className="overflow-hidden transition-all duration-300 ease-out" style={{ maxHeight: quotesOpen ? `${quotes.length * 120 + activeByStatus.length * 60 + 200}px` : "0px", opacity: quotesOpen ? 1 : 0 }}>
-            <div className="pt-3 space-y-4">
-              {quotes.length === 0 ? (
-                <div className="text-center py-10">
-                  <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
-                  <p className="text-muted-foreground">Nenhum orçamento ainda.</p>
+          <AnimatePresence>
+            {quotesOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                <div className="pt-4">
+                  {quotes.length === 0 ? (
+                    <div className="text-center py-10">
+                      <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
+                      <p className="text-muted-foreground">Nenhum orçamento ainda.</p>
+                    </div>
+                  ) : (
+                    <QuoteKanban />
+                  )}
                 </div>
-              ) : (
-                activeByStatus.filter(g => g.count > 0).map((group) => (
-                  <div key={group.status}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.color }} />
-                      <span className="text-sm font-bold text-foreground">{group.label} ({group.count})</span>
-                      <span className="text-xs text-muted-foreground">— {fmt(group.total)}</span>
-                    </div>
-                    <div className="space-y-2">
-                      {group.quotes.map((quote, i) => {
-                        const showWA = group.status === 'orcado';
-                        const showAprovar = group.status === 'enviado' || group.status === 'aguardando';
-                        const showPerdido = group.status === 'enviado' || group.status === 'aguardando';
-                        return (
-                          <motion.div key={quote.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
-                            <div className="bg-card rounded-xl shadow-card hover:shadow-elevated transition-shadow">
-                              <Link to={`/app/orcamento/${quote.id}`} className="block p-4">
-                                <div className="flex items-center justify-between mb-2">
-                                  <h3 className="font-bold text-foreground truncate">{quote.clientName}</h3>
-                                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${QUOTE_STATUS_BG[group.status]}`}>{group.label}</span>
-                                </div>
-                                <div className="flex items-center gap-4 text-sm">
-                                  <span className="text-muted-foreground">Total: <strong className="text-foreground">{fmt(quote.total)}</strong></span>
-                                </div>
-                              </Link>
-                              {(showWA || showAprovar || showPerdido) && (
-                                <div className="flex gap-2 px-4 pb-3 border-t border-border/50 pt-2 flex-wrap">
-                                  {showWA && (
-                                    <button onClick={async (e) => { e.preventDefault(); await changeQuoteStatus(quote.id, 'enviado'); triggerWhatsApp(quote); toast.success("Enviado! WhatsApp aberto."); }}
-                                      className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-[hsl(215,80%,55%)]/10 text-[hsl(215,80%,45%)] hover:bg-[hsl(215,80%,55%)]/20 transition-colors">
-                                      <Send className="h-3 w-3" /> Enviar WA
-                                    </button>
-                                  )}
-                                  {showAprovar && (
-                                    <button onClick={async (e) => { e.preventDefault(); await changeQuoteStatus(quote.id, 'aprovado'); toast.success("Aprovado! Obra criada. 🎉"); }}
-                                      className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors">
-                                      <CheckCircle2 className="h-3 w-3" /> Aprovar
-                                    </button>
-                                  )}
-                                  {showPerdido && (
-                                    <button onClick={async (e) => { e.preventDefault(); await changeQuoteStatus(quote.id, 'perdido'); toast("Marcado como Perdido."); }}
-                                      className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors">
-                                      <XCircle className="h-3 w-3" /> Perdido
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Minhas Obras */}
