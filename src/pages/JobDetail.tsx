@@ -268,6 +268,43 @@ const JobDetail = () => {
               <div className="text-xs text-muted-foreground">{profitPercent}%</div>
             </div>
           </div>
+
+          {/* Recebimentos — linha divisória + 2 colunas + barra */}
+          <div className="border-t border-border/50 pt-3 space-y-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-xs text-muted-foreground">Recebido</div>
+                <div className={`font-bold ${
+                  totalReceived >= job.saleValue && job.saleValue > 0
+                    ? "text-success"
+                    : totalReceived > 0
+                    ? "text-[hsl(45,95%,40%)]"
+                    : "text-muted-foreground"
+                }`}>{fmt(totalReceived)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">A Receber</div>
+                <div className={`font-bold ${balance > 0 ? "text-destructive" : "text-success"}`}>
+                  {fmt(Math.max(0, balance))}
+                </div>
+              </div>
+            </div>
+            {job.saleValue > 0 && (
+              <>
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      totalReceived >= job.saleValue ? "bg-success" : "bg-[hsl(45,95%,50%)]"
+                    }`}
+                    style={{ width: `${Math.min(100, (totalReceived / job.saleValue) * 100)}%` }}
+                  />
+                </div>
+                <div className="text-[10px] text-muted-foreground text-right">
+                  {Math.min(100, ((totalReceived / job.saleValue) * 100)).toFixed(0)}% recebido
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Tabs */}
