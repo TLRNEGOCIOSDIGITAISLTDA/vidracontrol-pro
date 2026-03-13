@@ -294,6 +294,13 @@ export async function addExpense(jobId: string, expense: Omit<Expense, 'id' | 'j
 
 // ---- Job Payments ----
 
+export async function getAllJobPaymentsTotal(): Promise<number> {
+  const { data } = await supabase
+    .from('job_payments' as any)
+    .select('amount');
+  return (data || []).reduce((s: number, r: any) => s + Number(r.amount), 0);
+}
+
 export async function getJobPayments(jobId: string): Promise<JobPayment[]> {
   const { data } = await supabase
     .from('job_payments' as any)

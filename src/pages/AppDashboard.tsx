@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronDown, Trash2, Percent, CalendarDays, LayoutGrid, List } from "lucide-react";
+import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronDown, Trash2, Percent, CalendarDays, LayoutGrid, List, Wallet, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { useData } from "@/lib/DataContext";
@@ -44,12 +44,13 @@ const HighlightCard = ({ children, className = "", lastUpdate }: { children: Rea
 };
 
 const AppDashboard = () => {
-  const { jobs, quotes, refreshAll, lastUpdate } = useData();
+  const { jobs, quotes, totalReceived, refreshAll, lastUpdate } = useData();
 
   useEffect(() => { refreshAll(); }, [refreshAll]);
 
   // Sales/Costs/Profit from jobs (expenses registered inside each job)
   const totalSales = jobs.reduce((s, j) => s + j.saleValue, 0);
+  const totalPending = Math.max(0, totalSales - totalReceived);
   const totalCosts = jobs.reduce((s, j) => s + j.expenses.reduce((es, e) => es + e.value, 0), 0);
   const totalProfit = totalSales - totalCosts;
   const avgMargin = totalSales > 0 ? ((totalProfit / totalSales) * 100) : 0;
@@ -133,6 +134,18 @@ const AppDashboard = () => {
             <Percent className="h-4 w-4 text-primary mb-1" />
             <div className="text-xs text-muted-foreground">Margem Média</div>
             <div className="text-sm font-bold text-primary truncate">{avgMargin.toFixed(1)}%</div>
+          </HighlightCard>
+          <HighlightCard lastUpdate={lastUpdate}>
+            <Wallet className="h-4 w-4 text-success mb-1" />
+            <div className="text-xs text-muted-foreground">Total Recebido</div>
+            <div className="text-sm font-bold text-success truncate">{fmt(totalReceived)}</div>
+          </HighlightCard>
+          <HighlightCard lastUpdate={lastUpdate}>
+            <Clock className="h-4 w-4 text-[hsl(45,95%,40%)] mb-1" />
+            <div className="text-xs text-muted-foreground">A Receber</div>
+            <div className={`text-sm font-bold truncate ${totalPending > 0 ? "text-[hsl(45,95%,40%)]" : "text-success"}`}>
+              {fmt(totalPending)}
+            </div>
           </HighlightCard>
         </div>
 

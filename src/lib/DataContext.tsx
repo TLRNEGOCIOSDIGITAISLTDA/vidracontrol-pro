@@ -3,6 +3,7 @@ import { Job, Quote, QuoteStatus, JobItem } from "./types";
 import {
   getJobs,
   getQuotes,
+  getAllJobPaymentsTotal,
   addJob as storageAddJob,
   addExpense as storageAddExpense,
   addQuoteCost as storageSaveCost,
@@ -17,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 interface DataContextType {
   jobs: Job[];
   quotes: Quote[];
+  totalReceived: number;
   loading: boolean;
   refreshAll: () => Promise<void>;
   refreshQuotes: () => Promise<void>;
@@ -35,6 +37,7 @@ const DataContext = createContext<DataContextType | null>(null);
 export function DataProvider({ children }: { children: ReactNode }) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [totalReceived, setTotalReceived] = useState(0);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
 
@@ -53,7 +56,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshAll = useCallback(async () => {
-    await Promise.all([refreshJobs(), refreshQuotes()]);
+    const [, , total] = await Promise.all([refreshJobs(), refreshQuotes(), getAllJobPaymentsTotal()]);
+    setTotalReceived(total);
     setLoading(false);
   }, [refreshJobs, refreshQuotes]);
 
@@ -144,7 +148,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [refreshAll]);
 
   return (
-    <DataContext.Provider value={{ jobs, quotes, loading, refreshAll, refreshQuotes, refreshJobs, addCost, removeCost, changeQuoteStatus, updateQuote, removeJob, removeQuote, lastUpdate }}>
+    <DataContext.Provider value={{ jobs, quotes, totalReceived, loading, refreshAll, refreshQuotes, refreshJobs, addCost, removeCost, changeQuoteStatus, updateQuote, removeJob, removeQuote, lastUpdate }}>
       {children}
     </DataContext.Provider>
   );
