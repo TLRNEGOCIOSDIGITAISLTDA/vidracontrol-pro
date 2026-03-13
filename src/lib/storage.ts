@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Job, Expense, Quote, CompanyInfo, QuoteCost, JobItem, QuoteItem, UserProfile, Product, ProductCategory } from './types';
+import { Job, Expense, Quote, CompanyInfo, QuoteCost, JobItem, QuoteItem, UserProfile, Product, ProductCategory, JobPayment, PaymentMethod } from './types';
 
 async function getUserId(): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -290,6 +290,61 @@ export async function addExpense(jobId: string, expense: Omit<Expense, 'id' | 'j
     photoUrl: data.photo_url || undefined,
     createdAt: data.created_at,
   };
+}
+
+// ---- Job Payments ----
+
+export async function getJobPayments(jobId: string): Promise<JobPayment[]> {
+  const { data } = await supabase
+    .from('job_payments' as any)
+    .select('*')
+    .eq('job_id', jobId)
+    .order('payment_date', { ascending: false });
+  return (data || []).map((r: any) => ({
+    id: r.id,
+    jobId: r.job_id,
+    amount: Number(r.amount),
+    paymentDate: r.payment_date,
+    paymentMethod: r.payment_method as PaymentMethod,
+    notes: r.notes || undefined,
+    createdAt: r.created_at,
+  }));
+}
+
+export async function addJobPayment(
+  jobId: string,
+  payment: Omit<JobPayment, 'id' | 'jobId' | 'createdAt'>
+): Promise<JobPayment | null> {
+  const uid = await getUserId();
+  const { data, error } = await supabase
+    .from('job_payments' as any)
+    .insert({
+      job_id: jobId,
+      user_id: uid,
+      amount: payment.amount,
+      payment_date: payment.paymentDate,
+      payment_method: payment.paymentMethod,
+      notes: payment.notes || null,
+    } as any)
+    .select()
+    .single();
+  if (error || !data) return null;
+  const r = data as any;
+  await logAudit('create', 'job_payment', r.id, { jobId, amount: payment.amount });
+  return {
+    id: r.id,
+    jobId: r.job_id,
+    amount: Number(r.amount),
+    paymentDate: r.payment_date,
+    paymentMethod: r.payment_method,
+    notes: r.notes || undefined,
+    createdAt: r.created_at,
+  };
+}
+
+export async function deleteJobPayment(paymentId: string): Promise<void> {
+  await supabase.from('job_payments' as any).delete().eq('id', paymentId);
+  await logAudit('delete', 'job_payment', paymentId);
 }
 
 export async function deleteExpense(jobId: string, expenseId: string) {

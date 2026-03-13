@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { useData } from "@/lib/DataContext";
 import { clearAllData } from "@/lib/storage";
-import { QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS, QUOTE_STATUS_BG } from "@/lib/types";
+import { QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS, QUOTE_STATUS_BG, JOB_STATUS_LABELS, JOB_STATUS_COLORS, JobStatus } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { toast } from "sonner";
@@ -404,8 +404,8 @@ const AppDashboard = () => {
                         <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow">
                           <div className="flex items-center justify-between mb-2">
                             <h3 className="font-bold text-foreground truncate">{job.clientName}</h3>
-                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${job.status === 'concluido' ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary'}`}>
-                              {job.status === 'concluido' ? 'Concluído' : 'Em andamento'}
+                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${JOB_STATUS_COLORS[(job.status as JobStatus) || 'em_andamento']}`}>
+                              {JOB_STATUS_LABELS[(job.status as JobStatus) || 'em_andamento']}
                             </span>
                           </div>
                           <p className="text-sm text-muted-foreground truncate mb-3">{job.description}</p>

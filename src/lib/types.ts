@@ -46,12 +46,42 @@ export interface JobItem {
   area?: number;
 }
 
+export type JobStatus = 'a_iniciar' | 'em_andamento' | 'aguardando_pagamento' | 'concluido';
+
+export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
+  a_iniciar: 'A Iniciar',
+  em_andamento: 'Em Andamento',
+  aguardando_pagamento: 'Aguard. Pagamento',
+  concluido: 'Finalizada',
+};
+
+export const JOB_STATUS_COLORS: Record<JobStatus, string> = {
+  a_iniciar: 'bg-muted text-muted-foreground',
+  em_andamento: 'bg-primary/10 text-primary',
+  aguardando_pagamento: 'bg-[hsl(45,95%,50%)]/10 text-[hsl(45,95%,40%)]',
+  concluido: 'bg-success/10 text-success',
+};
+
+export type PaymentMethod = 'Pix' | 'Dinheiro' | 'Cartão';
+
+export const PAYMENT_METHODS: PaymentMethod[] = ['Pix', 'Dinheiro', 'Cartão'];
+
+export interface JobPayment {
+  id: string;
+  jobId: string;
+  amount: number;
+  paymentDate: string;
+  paymentMethod: PaymentMethod;
+  notes?: string;
+  createdAt: string;
+}
+
 export interface Job {
   id: string;
   clientName: string;
   description: string;
   saleValue: number;
-  status: 'em_andamento' | 'concluido';
+  status: JobStatus;
   createdAt: string;
   expenses: Expense[];
   items?: JobItem[];
