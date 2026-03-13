@@ -56,9 +56,9 @@ function KanbanCard({
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 999 }
     : undefined;
 
-  const showWA = status === "orcado" || status === "enviado";
-  const showAprovar = status !== "aprovado" && status !== "perdido";
-  const showPerdido = status !== "aprovado" && status !== "perdido";
+  const showWA = status === "orcado";
+  const showAprovar = status === "enviado" || status === "aguardando";
+  const showPerdido = status === "enviado" || status === "aguardando";
 
   return (
     <div
@@ -484,9 +484,9 @@ const QuoteList = () => {
                     <div className="space-y-2">
                       {group.quotes.map((q, i) => {
                         const qStatus = (q.status || "orcado") as QuoteStatus;
-                        const qShowWA = qStatus === "orcado" || qStatus === "enviado";
-                        const qShowAprovar = qStatus !== "aprovado" && qStatus !== "perdido";
-                        const qShowPerdido = qStatus !== "aprovado" && qStatus !== "perdido";
+                        const qShowWA = qStatus === "orcado";
+                        const qShowAprovar = qStatus === "enviado" || qStatus === "aguardando";
+                        const qShowPerdido = qStatus === "enviado" || qStatus === "aguardando";
                         const isNovo = q.id === novoId;
                         return (
                         <motion.div
