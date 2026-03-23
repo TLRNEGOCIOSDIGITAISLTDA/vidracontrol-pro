@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, XCircle, Send, Eye } from "lucide-react";
+import { CheckCircle2, XCircle, Eye } from "lucide-react";
 import { useData } from "@/lib/DataContext";
 import { Quote, QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from "@/lib/types";
 import { toast } from "sonner";
+import { QuoteSendMenu } from "./QuoteSendMenu";
 import {
   DndContext,
   DragEndEvent,
@@ -18,12 +19,9 @@ import {
 
 const KANBAN_STATUSES: QuoteStatus[] = ["orcado", "enviado", "aprovado", "perdido"];
 
-function triggerWhatsApp(quote: Quote) {
+function triggerWhatsAppSimples(quote: Quote) {
   const phone = quote.clientPhone?.replace(/\D/g, "");
-  if (!phone || phone.length !== 11) {
-    toast.error("Telefone do cliente não cadastrado.");
-    return;
-  }
+  if (!phone || phone.length !== 11) return;
   const appUrl = `${window.location.origin}/orcamento-publico/${quote.id}`;
   const msg = `Olá ${quote.clientName}! Segue o orçamento conforme solicitado: ${appUrl}\n\nQualquer dúvida estou à disposição!`;
   window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, "_blank");
@@ -88,17 +86,7 @@ function KanbanCard({
           <Eye className="h-2.5 w-2.5" /> Ver + Editar
         </Link>
         {showWA && (
-          <button
-            onClick={async (e) => {
-              e.preventDefault();
-              await onStatusChange(quote.id, "enviado");
-              triggerWhatsApp(quote);
-              toast.success("Enviado! WhatsApp aberto.");
-            }}
-            className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md bg-[hsl(215,80%,55%)]/10 text-[hsl(215,80%,45%)] hover:bg-[hsl(215,80%,55%)]/20 transition-colors"
-          >
-            <Send className="h-2.5 w-2.5" /> Enviar WA
-          </button>
+          <QuoteSendMenu quote={quote} onStatusChange={onStatusChange} size="sm" />
         )}
         {showAprovar && (
           <button
@@ -223,7 +211,7 @@ export function QuoteKanban({ novoId }: { novoId?: string | null }) {
     await changeQuoteStatus(quoteId, newStatus);
 
     if (newStatus === "enviado") {
-      triggerWhatsApp(quote);
+      triggerWhatsAppSimples(quote);
       toast.success("Status: Enviado. WhatsApp aberto!");
     } else if (newStatus === "aprovado") {
       toast.success("Obra criada com sucesso!");

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Plus, FileText, LayoutGrid, List, CheckCircle2, XCircle, Send, Eye } from "lucide-react";
+import { Plus, FileText, LayoutGrid, List, CheckCircle2, XCircle, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { useData } from "@/lib/DataContext";
@@ -9,19 +9,9 @@ import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { toast } from "sonner";
 import { QuoteKanban } from "@/components/app/QuoteKanban";
+import { QuoteSendMenu } from "@/components/app/QuoteSendMenu";
 
 const ALL_STATUSES: QuoteStatus[] = ["orcado", "enviado", "aguardando", "aprovado", "perdido"];
-
-function triggerWhatsApp(quote: { clientPhone?: string; clientName: string; id: string }) {
-  const phone = quote.clientPhone?.replace(/\D/g, "");
-  if (!phone || phone.length !== 11) {
-    toast.error("Telefone do cliente não cadastrado.");
-    return;
-  }
-  const appUrl = `${window.location.origin}/orcamento-publico/${quote.id}`;
-  const msg = `Olá ${quote.clientName}! Segue o orçamento conforme solicitado: ${appUrl}\n\nQualquer dúvida estou à disposição!`;
-  window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, "_blank");
-}
 
 // ===== MAIN =====
 const QuoteList = () => {
@@ -268,17 +258,7 @@ const QuoteList = () => {
                                   <Eye className="h-3 w-3" /> Ver + Editar
                                 </Link>
                                 {qShowWA && (
-                                  <button
-                                    onClick={async (e) => {
-                                      e.preventDefault();
-                                      await handleStatusChange(q.id, "enviado");
-                                      triggerWhatsApp(q);
-                                      toast.success("Enviado! WhatsApp aberto.");
-                                    }}
-                                    className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-[hsl(215,80%,55%)]/10 text-[hsl(215,80%,45%)] hover:bg-[hsl(215,80%,55%)]/20 transition-colors"
-                                  >
-                                    <Send className="h-3 w-3" /> Enviar WA
-                                  </button>
+                                  <QuoteSendMenu quote={q} onStatusChange={handleStatusChange} size="md" />
                                 )}
                                 {qShowAprovar && (
                                   <button
