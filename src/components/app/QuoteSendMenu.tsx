@@ -71,7 +71,7 @@ export function QuoteSendMenu({ quote, onStatusChange, size = "sm" }: Props) {
     const profile = await getProfile();
     const whatsapp = profile?.whatsapp ? maskWhatsApp(profile.whatsapp) : "";
 
-    const doc = generateQuotePdf(quote, whatsapp);
+    const doc = await generateQuotePdf(quote, whatsapp);
     const fileName = `orcamento-${quote.clientName.replace(/\s+/g, "-").toLowerCase()}-${quote.id.slice(0, 8)}.pdf`;
 
     await onStatusChange(quote.id, "enviado");

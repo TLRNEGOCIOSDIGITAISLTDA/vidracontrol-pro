@@ -361,42 +361,81 @@ export async function deleteExpense(jobId: string, expenseId: string) {
 
 // ---- Company Info ----
 
+function parseAddressFields(address: string): import('./types').AddressFields | undefined {
+  try {
+    const parsed = JSON.parse(address);
+    if (parsed && typeof parsed === 'object' && 'street' in parsed) return parsed;
+  } catch { /* not JSON */ }
+  return undefined;
+}
+
+function formatAddress(fields: import('./types').AddressFields): string {
+  const parts: string[] = [];
+  if (fields.street && fields.number) parts.push(`${fields.street}, ${fields.number}`);
+  else if (fields.street) parts.push(fields.street);
+  if (fields.neighborhood) parts.push(fields.neighborhood);
+  const cityState = [fields.city, fields.state].filter(Boolean).join(' - ');
+  if (cityState) parts.push(cityState);
+  if (fields.cep) parts.push(`CEP: ${fields.cep}`);
+  return parts.join(', ');
+}
+
 export async function getCompanyInfo(): Promise<CompanyInfo> {
   const def: CompanyInfo = { name: '', cnpjCpf: '', phone: '', email: '', address: '' };
   const { data } = await supabase.from('company_info').select('*').limit(1).single();
   if (!data) return def;
+  const d = data as any;
+  const addressFields = parseAddressFields(d.address || '');
   return {
-    name: data.name,
-    cnpjCpf: data.cnpj_cpf,
-    phone: data.phone,
-    email: data.email,
-    address: data.address,
-    logoUrl: data.logo_url || undefined,
+    name: d.name,
+    cnpjCpf: d.cnpj_cpf,
+    phone: d.phone,
+    email: d.email,
+    address: addressFields ? formatAddress(addressFields) : (d.address || ''),
+    website: d.website || undefined,
+    logoUrl: d.logo_url || undefined,
+    addressFields,
   };
 }
 
 export async function saveCompanyInfo(info: CompanyInfo) {
   const uid = await getUserId();
+  const addressToStore = info.addressFields
+    ? JSON.stringify(info.addressFields)
+    : info.address;
+  const baseData = {
+    name: info.name,
+    cnpj_cpf: info.cnpjCpf,
+    phone: info.phone,
+    email: info.email,
+    address: addressToStore,
+    logo_url: info.logoUrl || null,
+  };
+  const withWebsite = { ...baseData, website: info.website || null };
+
   const { data: existing } = await supabase.from('company_info').select('id').limit(1).single();
   if (existing) {
-    await supabase.from('company_info').update({
-      name: info.name,
-      cnpj_cpf: info.cnpjCpf,
-      phone: info.phone,
-      email: info.email,
-      address: info.address,
-      logo_url: info.logoUrl || null,
-    }).eq('id', existing.id);
+    const { error } = await supabase.from('company_info').update(withWebsite as any).eq('id', existing.id);
+    if (error) await supabase.from('company_info').update(baseData).eq('id', existing.id);
   } else {
-    await supabase.from('company_info').insert({
-      name: info.name,
-      cnpj_cpf: info.cnpjCpf,
-      phone: info.phone,
-      email: info.email,
-      address: info.address,
-      logo_url: info.logoUrl || null,
-      user_id: uid,
-    });
+    const { error } = await supabase.from('company_info').insert({ ...withWebsite, user_id: uid } as any);
+    if (error) await supabase.from('company_info').insert({ ...baseData, user_id: uid });
+  }
+}
+
+export async function uploadCompanyLogo(file: File): Promise<string | null> {
+  try {
+    const uid = await getUserId();
+    const ext = file.name.split('.').pop() || 'png';
+    const fileName = `${uid}-logo.${ext}`;
+    const { error } = await supabase.storage
+      .from('company-logos')
+      .upload(fileName, file, { upsert: true, contentType: file.type });
+    if (error) return null;
+    const { data } = supabase.storage.from('company-logos').getPublicUrl(fileName);
+    return data.publicUrl;
+  } catch {
+    return null;
   }
 }
 

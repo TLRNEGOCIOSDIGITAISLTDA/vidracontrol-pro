@@ -99,7 +99,7 @@ const QuoteDetail = () => {
       const profile = await getProfile();
       const userName = profile?.fullName || quote.companyInfo.name || 'Empresa';
 
-      const doc = generateQuotePdf(quote, profile?.whatsapp ? maskWhatsApp(profile.whatsapp) : '');
+      const doc = await generateQuotePdf(quote, profile?.whatsapp ? maskWhatsApp(profile.whatsapp) : '');
       const pdfBlob = doc.output('blob');
       const fileName = `orcamento-${quote.clientName.replace(/\s+/g, '-').toLowerCase()}-${id.slice(0, 8)}.pdf`;
 

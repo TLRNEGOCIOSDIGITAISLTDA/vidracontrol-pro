@@ -122,13 +122,24 @@ export interface QuoteItem {
   total: number;
 }
 
+export interface AddressFields {
+  street: string;
+  number: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  cep: string;
+}
+
 export interface CompanyInfo {
   name: string;
   cnpjCpf: string;
   phone: string;
   email: string;
-  address: string;
+  address: string; // string formatada para exibição/PDF
+  website?: string;
   logoUrl?: string;
+  addressFields?: AddressFields; // campos estruturados (salvo como JSON em address)
 }
 
 export type QuoteStatus = 'orcado' | 'enviado' | 'aguardando' | 'aprovado' | 'perdido';
