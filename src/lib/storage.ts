@@ -24,9 +24,11 @@ export async function logAudit(action: string, entityType?: string, entityId?: s
 // ---- Quotes ----
 
 export async function getQuotes(): Promise<Quote[]> {
+  const uid = await getUserId();                          // [SEC] filtro explícito
   const { data: rows, error } = await supabase
     .from('quotes')
     .select('*')
+    .eq('user_id', uid)
     .order('created_at', { ascending: false });
   if (error || !rows) return [];
 
@@ -172,12 +174,14 @@ export async function addQuote(quote: Omit<Quote, 'id' | 'createdAt'>): Promise<
 }
 
 export async function deleteQuote(id: string) {
-  await supabase.from('quotes').delete().eq('id', id);
+  const uid = await getUserId();                          // [SEC] valida dono
+  await supabase.from('quotes').delete().eq('id', id).eq('user_id', uid);
   await logAudit('delete', 'quote', id);
 }
 
 export async function saveQuoteStatus(quoteId: string, status: string) {
-  await supabase.from('quotes').update({ status }).eq('id', quoteId);
+  const uid = await getUserId();                          // [SEC] valida dono
+  await supabase.from('quotes').update({ status }).eq('id', quoteId).eq('user_id', uid);
   await logAudit('update_status', 'quote', quoteId, { status });
 }
 
@@ -208,16 +212,19 @@ export async function addQuoteCost(quoteId: string, cost: Omit<QuoteCost, 'id' |
 }
 
 export async function deleteQuoteCost(quoteId: string, costId: string) {
-  await supabase.from('quote_costs').delete().eq('id', costId);
+  const uid = await getUserId();                          // [SEC] valida dono
+  await supabase.from('quote_costs').delete().eq('id', costId).eq('user_id', uid);
   await logAudit('delete', 'quote_cost', costId, { quoteId });
 }
 
 // ---- Jobs ----
 
 export async function getJobs(): Promise<Job[]> {
+  const uid = await getUserId();                          // [SEC] filtro explícito
   const { data: rows } = await supabase
     .from('jobs')
     .select('*')
+    .eq('user_id', uid)
     .order('created_at', { ascending: false });
   if (!rows) return [];
 
@@ -303,19 +310,21 @@ export async function addJob(job: Omit<Job, 'id' | 'createdAt' | 'expenses'> & {
 }
 
 export async function updateJob(id: string, data: Partial<Job>): Promise<Job | null> {
+  const uid = await getUserId();                          // [SEC] valida dono
   const update: any = {};
   if (data.clientName !== undefined) update.client_name = data.clientName;
   if (data.description !== undefined) update.description = data.description;
   if (data.saleValue !== undefined) update.sale_value = data.saleValue;
   if (data.status !== undefined) update.status = data.status;
 
-  await supabase.from('jobs').update(update).eq('id', id);
+  await supabase.from('jobs').update(update).eq('id', id).eq('user_id', uid);
   await logAudit('update', 'job', id, update);
   return await getJob(id) || null;
 }
 
 export async function deleteJob(id: string) {
-  await supabase.from('jobs').delete().eq('id', id);
+  const uid = await getUserId();                          // [SEC] valida dono
+  await supabase.from('jobs').delete().eq('id', id).eq('user_id', uid);
   await logAudit('delete', 'job', id);
 }
 
@@ -346,9 +355,11 @@ export async function addExpense(jobId: string, expense: Omit<Expense, 'id' | 'j
 // ---- Job Payments ----
 
 export async function getAllJobPaymentsTotal(): Promise<number> {
+  const uid = await getUserId();                          // [SEC] filtro explícito
   const { data } = await supabase
     .from('job_payments' as any)
-    .select('amount');
+    .select('amount')
+    .eq('user_id', uid);
   return (data || []).reduce((s: number, r: any) => s + Number(r.amount), 0);
 }
 
@@ -401,12 +412,14 @@ export async function addJobPayment(
 }
 
 export async function deleteJobPayment(paymentId: string): Promise<void> {
-  await supabase.from('job_payments' as any).delete().eq('id', paymentId);
+  const uid = await getUserId();                          // [SEC] valida dono
+  await supabase.from('job_payments' as any).delete().eq('id', paymentId).eq('user_id', uid);
   await logAudit('delete', 'job_payment', paymentId);
 }
 
 export async function deleteExpense(jobId: string, expenseId: string) {
-  await supabase.from('job_expenses').delete().eq('id', expenseId);
+  const uid = await getUserId();                          // [SEC] valida dono
+  await supabase.from('job_expenses').delete().eq('id', expenseId).eq('user_id', uid);
   await logAudit('delete', 'expense', expenseId, { jobId });
 }
 
@@ -432,8 +445,9 @@ function formatAddress(fields: import('./types').AddressFields): string {
 }
 
 export async function getCompanyInfo(): Promise<CompanyInfo> {
+  const uid = await getUserId();                          // [SEC] filtro explícito
   const def: CompanyInfo = { name: '', cnpjCpf: '', phone: '', email: '', address: '' };
-  const { data } = await supabase.from('company_info').select('*').limit(1).single();
+  const { data } = await supabase.from('company_info').select('*').eq('user_id', uid).limit(1).single();
   if (!data) return def;
   const d = data as any;
   const addressFields = parseAddressFields(d.address || '');
@@ -464,10 +478,11 @@ export async function saveCompanyInfo(info: CompanyInfo) {
   };
   const withWebsite = { ...baseData, website: info.website || null };
 
-  const { data: existing } = await supabase.from('company_info').select('id').limit(1).single();
+  // [SEC] sempre filtra por user_id ao buscar o registro existente
+  const { data: existing } = await supabase.from('company_info').select('id').eq('user_id', uid).limit(1).single();
   if (existing) {
-    const { error } = await supabase.from('company_info').update(withWebsite as any).eq('id', existing.id);
-    if (error) await supabase.from('company_info').update(baseData).eq('id', existing.id);
+    const { error } = await supabase.from('company_info').update(withWebsite as any).eq('id', existing.id).eq('user_id', uid);
+    if (error) await supabase.from('company_info').update(baseData).eq('id', existing.id).eq('user_id', uid);
   } else {
     const { error } = await supabase.from('company_info').insert({ ...withWebsite, user_id: uid } as any);
     if (error) await supabase.from('company_info').insert({ ...baseData, user_id: uid });
@@ -493,7 +508,8 @@ export async function uploadCompanyLogo(file: File): Promise<string | null> {
 // ---- User Profile ----
 
 export async function getProfile(): Promise<UserProfile | null> {
-  const { data } = await supabase.from('profiles' as any).select('*').limit(1).single();
+  const uid = await getUserId();                          // [SEC] filtro explícito
+  const { data } = await supabase.from('profiles' as any).select('*').eq('user_id', uid).limit(1).single();
   if (!data) return null;
   const d = data as any;
   return { id: d.id, userId: d.user_id, whatsapp: d.whatsapp, fullName: d.full_name };
@@ -507,7 +523,7 @@ export async function saveProfile(profile: { whatsapp: string; fullName: string 
       whatsapp: profile.whatsapp,
       full_name: profile.fullName,
       updated_at: new Date().toISOString(),
-    } as any).eq('id', (existing as any).id);
+    } as any).eq('id', (existing as any).id).eq('user_id', uid);      // [SEC] duplo filtro
   } else {
     await supabase.from('profiles' as any).insert({
       user_id: uid,
@@ -534,7 +550,8 @@ function rowToProduct(r: any): Product {
 }
 
 export async function getProducts(includeInactive = false): Promise<Product[]> {
-  let query = supabase.from('products' as any).select('*').order('name');
+  const uid = await getUserId();                          // [SEC] filtro explícito
+  let query = supabase.from('products' as any).select('*').eq('user_id', uid).order('name');
   if (!includeInactive) query = query.eq('active', true);
   const { data } = await query;
   return (data || []).map(rowToProduct);
@@ -556,6 +573,7 @@ export async function addProduct(product: Omit<Product, 'id' | 'userId' | 'creat
 }
 
 export async function updateProduct(id: string, updates: Partial<Omit<Product, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>): Promise<void> {
+  const uid = await getUserId();                          // [SEC] valida dono
   const payload: any = {};
   if (updates.name !== undefined) payload.name = updates.name;
   if (updates.unit !== undefined) payload.unit = updates.unit;
@@ -563,12 +581,13 @@ export async function updateProduct(id: string, updates: Partial<Omit<Product, '
   if (updates.category !== undefined) payload.category = updates.category;
   if (updates.active !== undefined) payload.active = updates.active;
   payload.updated_at = new Date().toISOString();
-  await supabase.from('products' as any).update(payload as any).eq('id', id);
+  await supabase.from('products' as any).update(payload as any).eq('id', id).eq('user_id', uid);
   await logAudit('update', 'product', id, payload);
 }
 
 export async function deleteProduct(id: string): Promise<void> {
-  await supabase.from('products' as any).delete().eq('id', id);
+  const uid = await getUserId();                          // [SEC] valida dono
+  await supabase.from('products' as any).delete().eq('id', id).eq('user_id', uid);
   await logAudit('delete', 'product', id);
 }
 
@@ -585,9 +604,10 @@ export async function updateQuote(quote: Quote): Promise<void> {
       ...(quote.commission ? { _commission: quote.commission } : {}),
       ...(quote.nfPercent ? { _nfPct: quote.nfPercent } : {}),
     } as any,
-  }).eq('id', quote.id);
+  }).eq('id', quote.id).eq('user_id', uid);                           // [SEC] valida dono
 
-  await supabase.from('quote_items').delete().eq('quote_id', quote.id);
+  // Deleta e recria os itens (sempre restringe ao user)
+  await supabase.from('quote_items').delete().eq('quote_id', quote.id).eq('user_id', uid);
   if (quote.items.length > 0) {
     await supabase.from('quote_items').insert(
       quote.items.map(i => ({

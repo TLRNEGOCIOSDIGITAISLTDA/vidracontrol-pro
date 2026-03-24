@@ -81,7 +81,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (!quote) return;
 
     // Read current status DIRECTLY from DB to avoid stale state causing duplicate job creation
-    const { data: dbRow } = await supabase.from('quotes').select('status').eq('id', quoteId).single();
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: dbRow } = await supabase.from('quotes').select('status').eq('id', quoteId).eq('user_id', user?.id).single();
     const prevStatus = (dbRow?.status as QuoteStatus) || 'orcado';
 
     await saveQuoteStatus(quoteId, newStatus);
