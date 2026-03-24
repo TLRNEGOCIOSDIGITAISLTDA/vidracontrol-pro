@@ -71,6 +71,9 @@ function KanbanCard({
           <p className="text-xs text-muted-foreground mb-1 truncate">{quote.jobType}</p>
         )}
         <p className="text-[10px] text-muted-foreground">
+          {quote.quoteNumber && (
+            <span className="font-semibold text-primary/70 mr-1.5">#{quote.quoteNumber}</span>
+          )}
           {new Date(quote.createdAt).toLocaleDateString("pt-BR")} ·{" "}
           {quote.items.length} {quote.items.length === 1 ? "item" : "itens"}
         </p>

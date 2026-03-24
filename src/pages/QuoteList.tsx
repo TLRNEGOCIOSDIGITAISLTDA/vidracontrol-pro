@@ -244,6 +244,9 @@ const QuoteList = () => {
                                 )}
                                 <div className="flex items-center justify-between">
                                   <span className="text-xs text-muted-foreground">
+                                    {q.quoteNumber && (
+                                      <span className="font-semibold text-primary/70 mr-1">#{q.quoteNumber} · </span>
+                                    )}
                                     {new Date(q.createdAt).toLocaleDateString("pt-BR")} ·{" "}
                                     {q.items.length} {q.items.length === 1 ? "item" : "itens"}
                                   </span>

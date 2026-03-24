@@ -222,6 +222,7 @@ export interface Product {
 
 export interface Quote {
   id: string;
+  quoteNumber?: string; // ex: "001/26"
   clientName: string;
   clientPhone?: string;
   jobType: string;

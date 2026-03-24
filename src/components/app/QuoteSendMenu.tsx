@@ -46,18 +46,19 @@ export function QuoteSendMenu({ quote, onStatusChange, size = "sm" }: Props) {
       })
       .join("\n");
 
+    const numLabel = quote.quoteNumber ? ` (N ${quote.quoteNumber})` : "";
     const msg = [
-      `Olá ${quote.clientName}! Segue o orçamento conforme solicitado:`,
+      `Ola ${quote.clientName}! Segue o orcamento${numLabel} conforme solicitado:`,
       "",
       `*${companyName.toUpperCase()}*`,
       "",
-      `📋 *Itens do orçamento:*`,
+      `*Itens do orcamento:*`,
       itemLines,
       "",
-      `💰 *Valor total: ${fmt(quote.total)}*`,
-      `⏳ Validade: 7 dias úteis`,
+      `*Valor total: ${fmt(quote.total)}*`,
+      `Validade: 7 dias uteis`,
       "",
-      `Qualquer dúvida estou à disposição!`,
+      `Qualquer duvida estou a disposicao!`,
       `Att, ${companyName}`,
     ].join("\n");
 

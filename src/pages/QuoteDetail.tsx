@@ -241,8 +241,15 @@ const QuoteDetail = () => {
 
         {/* ===== KANBAN FLOW ===== */}
         <div className="bg-card rounded-xl p-4 shadow-card space-y-3">
-          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
-            Fluxo do Orçamento
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
+              Fluxo do Orçamento
+            </div>
+            {quote.quoteNumber && (
+              <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                #{quote.quoteNumber}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
             {FLOW_STEPS.map((step, i) => {

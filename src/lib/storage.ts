@@ -39,13 +39,14 @@ export async function getQuotes(): Promise<Quote[]> {
 
   return rows.map(r => ({
     id: r.id,
+    quoteNumber: (r as any).quote_number || undefined,
     clientName: r.client_name,
     clientPhone: (r as any).client_phone || '',
     jobType: r.job_type || '',
     total: Number(r.total),
     companyInfo: (() => {
       const ci = (r.company_info as any) || {};
-      return { name: ci.name || '', cnpjCpf: ci.cnpjCpf || '', phone: ci.phone || '', email: ci.email || '', address: ci.address || '', logoUrl: ci.logoUrl };
+      return { name: ci.name || '', cnpjCpf: ci.cnpjCpf || '', phone: ci.phone || '', email: ci.email || '', address: ci.address || '', logoUrl: ci.logoUrl, website: ci.website };
     })(),
     createdAt: r.created_at,
     notes: r.notes || undefined,
@@ -82,6 +83,22 @@ export async function getQuote(id: string): Promise<Quote | undefined> {
 
 export async function addQuote(quote: Omit<Quote, 'id' | 'createdAt'>): Promise<Quote> {
   const uid = await getUserId();
+
+  // Gera número sequencial: 001/26, 002/26...
+  const year = new Date().getFullYear().toString().slice(-2);
+  const { data: existingNums } = await supabase
+    .from('quotes')
+    .select('quote_number')
+    .eq('user_id', uid) as any;
+  const maxNum = ((existingNums as any[]) || []).reduce((max: number, row: any) => {
+    if (!row.quote_number) return max;
+    const parts = String(row.quote_number).split('/');
+    if (parts.length !== 2 || parts[1] !== year) return max;
+    const num = parseInt(parts[0]);
+    return isNaN(num) ? max : Math.max(max, num);
+  }, 0);
+  const quoteNumber = `${(maxNum + 1).toString().padStart(3, '0')}/${year}`;
+
   const { data: row, error } = await supabase.from('quotes').insert({
     client_name: quote.clientName,
     client_phone: quote.clientPhone || '',
@@ -89,6 +106,7 @@ export async function addQuote(quote: Omit<Quote, 'id' | 'createdAt'>): Promise<
     total: quote.total,
     notes: quote.notes || null,
     status: quote.status || 'orcado',
+    quote_number: quoteNumber,
     company_info: {
       ...quote.companyInfo,
       ...(quote.commission ? { _commission: quote.commission } : {}),
@@ -116,8 +134,8 @@ export async function addQuote(quote: Omit<Quote, 'id' | 'createdAt'>): Promise<
     );
   }
 
-  await logAudit('create', 'quote', row.id, { clientName: quote.clientName });
-  return { ...quote, id: row.id, createdAt: row.created_at, costs: [] } as Quote;
+  await logAudit('create', 'quote', row.id, { clientName: quote.clientName, quoteNumber });
+  return { ...quote, id: row.id, quoteNumber, createdAt: row.created_at, costs: [] } as Quote;
 }
 
 export async function deleteQuote(id: string) {
