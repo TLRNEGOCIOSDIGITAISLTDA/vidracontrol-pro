@@ -37,7 +37,7 @@ export async function getQuotes(): Promise<Quote[]> {
     supabase.from('quote_costs').select('*').in('quote_id', quoteIds.length ? quoteIds : ['']),
   ]);
 
-  return rows.map(r => ({
+  const result = rows.map(r => ({
     id: r.id,
     quoteNumber: (r as any).quote_number || undefined,
     clientName: r.client_name,
@@ -74,6 +74,39 @@ export async function getQuotes(): Promise<Quote[]> {
       createdAt: c.created_at,
     })),
   }));
+
+  // Backfill em memória para orçamentos sem quote_number (migration ainda não aplicada)
+  const yr = (d: string) => new Date(d).getFullYear().toString().slice(-2);
+  const byYear: Record<string, typeof result> = {};
+  result.forEach(q => {
+    const y = yr(q.createdAt);
+    if (!byYear[y]) byYear[y] = [];
+    byYear[y].push(q);
+  });
+  Object.entries(byYear).forEach(([year, qs]) => {
+    const taken = new Set<number>();
+    qs.forEach(q => {
+      if (q.quoteNumber) {
+        const parts = q.quoteNumber.split('/');
+        if (parts.length === 2 && parts[1] === year) {
+          const n = parseInt(parts[0]);
+          if (!isNaN(n)) taken.add(n);
+        }
+      }
+    });
+    const needsNumber = qs
+      .filter(q => !q.quoteNumber)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    let next = 1;
+    needsNumber.forEach(q => {
+      while (taken.has(next)) next++;
+      q.quoteNumber = `${next.toString().padStart(3, '0')}/${year}`;
+      taken.add(next);
+      next++;
+    });
+  });
+
+  return result;
 }
 
 export async function getQuote(id: string): Promise<Quote | undefined> {

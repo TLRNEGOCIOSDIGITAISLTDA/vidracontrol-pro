@@ -2,6 +2,22 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Quote } from './types';
 
+// ── Encoding ────────────────────────────────────────────────────────────────
+// jsPDF v4 com Helvetica suporta Latin-1 (U+0000–U+00FF).
+// O maior risco é o Unicode vir em forma decomposta (NFD), onde "ã" é a+tilde
+// como dois code-points. normalize('NFC') recompõe em um único char, que fica
+// dentro do range Latin-1 e é renderizado corretamente pelo Helvetica.
+function t(str: string): string {
+  if (!str) return '';
+  return str
+    .normalize('NFC')                        // recompõe chars acentuados
+    .replace(/[\u2013\u2014]/g, '-')         // em-dash / en-dash → hífen
+    .replace(/[\u2018\u2019\u02BC]/g, "'")   // aspas simples curvas → '
+    .replace(/[\u201C\u201D]/g, '"')         // aspas duplas curvas → "
+    .replace(/\u2026/g, '...')               // reticências → ...
+    .replace(/[^\x00-\xFF]/g, '?');          // demais chars fora Latin-1 → ?
+}
+
 async function loadImageBase64(url: string): Promise<string | null> {
   try {
     const res = await fetch(url);
@@ -17,108 +33,89 @@ async function loadImageBase64(url: string): Promise<string | null> {
   }
 }
 
-// Remove caracteres fora do Latin-1 para evitar encoding corrompido no jsPDF
-function safe(str: string): string {
-  return str
-    .replace(/[\u2013\u2014]/g, '-')   // em-dash, en-dash
-    .replace(/[\u2018\u2019]/g, "'")   // aspas curvas simples
-    .replace(/[\u201C\u201D]/g, '"')   // aspas curvas duplas
-    .replace(/[^\x00-\xFF]/g, '?');    // demais chars fora Latin-1
-}
-
-const NAVY   = [30, 41, 59]    as const;
-const ACCENT = [51, 102, 204]  as const;
-const LIGHT  = [241, 245, 249] as const;
-const WHITE  = [255, 255, 255] as const;
+const NAVY   = [30, 41, 59]    as [number, number, number];
+const ACCENT = [51, 102, 204]  as [number, number, number];
+const LIGHT  = [241, 245, 249] as [number, number, number];
+const WHITE  = [255, 255, 255] as [number, number, number];
 
 export async function generateQuotePdf(quote: Quote, userWhatsapp?: string): Promise<jsPDF> {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', putOnlyUsedFonts: true });
+
+  // Garante que o font padrão é Helvetica com encoding Latin-1 desde o início
+  doc.setFont('helvetica', 'normal');
+
   const co = quote.companyInfo;
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const date = new Date(quote.createdAt).toLocaleDateString('pt-BR');
-  const quoteNum = quote.quoteNumber || quote.id.slice(0, 8).toUpperCase();
+
+  // Bug 1 fix: usa quoteNumber (preenchido via backfill em storage se necessário)
+  const quoteNum = quote.quoteNumber ?? quote.id.slice(0, 8).toUpperCase();
+
   const hasCompanyData = !!(co.name || co.phone || co.email);
 
-  const PW = 210;
-  const ML = 14;
-  const MR = 14;
-  const CW = PW - ML - MR; // 182mm
+  const PW = 210, ML = 14, MR = 14, CW = PW - ML - MR;
 
-  // =====================================================
-  // CABECALHO — fundo navy, altura generosa
-  // =====================================================
+  // ══════════════════════════════════════════════════════════════
+  // CABEÇALHO — fundo navy, altura generosa
+  // ══════════════════════════════════════════════════════════════
   const HEADER_H = 50;
   doc.setFillColor(...NAVY);
   doc.rect(0, 0, PW, HEADER_H, 'F');
 
-  // Logo
   let logoBase64: string | null = null;
   if (co.logoUrl) logoBase64 = await loadImageBase64(co.logoUrl);
 
-  const LOGO_W = 36;
-  const LOGO_H = 30;
-  const LOGO_X = ML;
-  const LOGO_Y = (HEADER_H - LOGO_H) / 2;  // centralizado verticalmente
+  const LOGO_W = 36, LOGO_H = 30;
+  const LOGO_X = ML, LOGO_Y = (HEADER_H - LOGO_H) / 2;
 
   let textX = ML;
   if (logoBase64) {
     try {
-      // Fundo branco arredondado para o logo
       doc.setFillColor(...WHITE);
       doc.roundedRect(LOGO_X - 1, LOGO_Y - 1, LOGO_W + 2, LOGO_H + 2, 2, 2, 'F');
       doc.addImage(logoBase64, 'JPEG', LOGO_X, LOGO_Y, LOGO_W, LOGO_H);
       textX = LOGO_X + LOGO_W + 7;
-    } catch {
-      textX = ML;
-    }
+    } catch { textX = ML; }
   }
 
-  // Nome da empresa — fonte grande
+  // Nome da empresa
   doc.setTextColor(...WHITE);
-  const nameX = textX;
-  const nameY = 17;
   if (co.name) {
     doc.setFontSize(17);
     doc.setFont('helvetica', 'bold');
-    doc.text(safe(co.name.toUpperCase()), nameX, nameY);
+    doc.text(t(co.name.toUpperCase()), textX, 17);
   }
 
-  // Dados da empresa abaixo do nome
+  // Dados da empresa
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(200, 220, 255);
-  let cy = nameY + 6;
+  let cy = 24;
   const hline = (txt: string) => {
     if (!txt.trim()) return;
-    doc.text(safe(txt), nameX, cy);
+    doc.text(t(txt), textX, cy);
     cy += 4.8;
   };
-
   if (co.address) hline(co.address);
-  const cnpjPhone = [
-    co.cnpjCpf ? `CNPJ/CPF: ${co.cnpjCpf}` : '',
-    co.phone   ? `Tel: ${co.phone}`          : '',
-  ].filter(Boolean).join('   |   ');
-  hline(cnpjPhone);
-  const emailSite = [co.email, (co as any).website].filter(Boolean).join('   |   ');
-  hline(emailSite);
+  hline([co.cnpjCpf ? `CNPJ/CPF: ${co.cnpjCpf}` : '', co.phone ? `Tel: ${co.phone}` : ''].filter(Boolean).join('   |   '));
+  hline([co.email, (co as any).website].filter(Boolean).join('   |   '));
 
-  // Numero do orcamento e data — canto superior direito do cabecalho
+  // Número e data — canto direito do cabeçalho
   doc.setTextColor(...WHITE);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
-  doc.text(`Orcamento N: ${quoteNum}`, PW - MR, 13, { align: 'right' });
+  doc.text(`Orcamento N: ${t(quoteNum)}`, PW - MR, 13, { align: 'right' });
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.text(`Data: ${date}`, PW - MR, 19, { align: 'right' });
 
   doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'normal');
 
-  // =====================================================
-  // AVISO SE SEM DADOS DA EMPRESA
-  // =====================================================
+  // ══════════════════════════════════════════════════════════════
+  // AVISO: empresa sem cadastro
+  // ══════════════════════════════════════════════════════════════
   let y = HEADER_H + 7;
-
   if (!hasCompanyData) {
     doc.setFillColor(255, 245, 200);
     doc.setDrawColor(220, 180, 0);
@@ -128,82 +125,80 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string): Pro
     doc.setTextColor(160, 110, 0);
     doc.text('Complete seus dados na aba Perfil para gerar o PDF completo.', ML + 4, y + 2);
     doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
     y += 14;
   }
 
-  // =====================================================
+  // ══════════════════════════════════════════════════════════════
   // BLOCO DO CLIENTE — 2 colunas
-  // =====================================================
+  // ══════════════════════════════════════════════════════════════
   const CLIENT_H = 32;
   doc.setFillColor(...LIGHT);
   doc.roundedRect(ML, y - 3, CW, CLIENT_H, 2, 2, 'F');
 
-  // Titulo
+  // Títulos
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...ACCENT);
   doc.text('DADOS DO CLIENTE', ML + 4, y + 3);
   doc.text('DADOS DO ORCAMENTO', ML + CW / 2 + 4, y + 3);
 
-  // Linha divisoria vertical
+  // Divisória
   doc.setDrawColor(200, 210, 230);
   doc.setLineWidth(0.3);
   doc.line(ML + CW / 2, y, ML + CW / 2, y + CLIENT_H - 4);
 
   // Coluna esquerda
-  doc.setFontSize(9.5);
   doc.setTextColor(30, 30, 30);
   let ly = y + 10;
-  const clientRows: [string, string][] = [
-    ['Cliente:', safe(quote.clientName)],
-    ...(quote.clientPhone ? [['Telefone:', safe(quote.clientPhone)] as [string, string]] : []),
-  ];
-  clientRows.forEach(([label, val]) => {
+  ([
+    ['Cliente:', t(quote.clientName)],
+    ...(quote.clientPhone ? [['Telefone:', t(quote.clientPhone)]] : []),
+  ] as [string, string][]).forEach(([label, val]) => {
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.text(label, ML + 4, ly);
     doc.setFont('helvetica', 'normal');
-    doc.text(val, ML + 22, ly);
+    doc.text(val, ML + 4 + doc.getTextWidth(label) + 2, ly);
     ly += 6;
   });
 
   // Coluna direita
   const RX = ML + CW / 2 + 4;
   let ry = y + 10;
-  const rightRows: [string, string][] = [
-    ['N do Orcamento:', quoteNum],
+  ([
+    ['N do Orcamento:', t(quoteNum)],
     ['Data:', date],
-    ...(quote.jobType ? [['Tipo:', safe(quote.jobType)] as [string, string]] : []),
-  ];
-  rightRows.forEach(([label, val]) => {
+    ...(quote.jobType ? [['Tipo:', t(quote.jobType)]] : []),
+  ] as [string, string][]).forEach(([label, val]) => {
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.text(label, RX, ry);
     doc.setFont('helvetica', 'normal');
-    const labelW = doc.getTextWidth(label);
-    doc.text(val, RX + labelW + 2, ry);
+    doc.text(val, RX + doc.getTextWidth(label) + 2, ry);
     ry += 6;
   });
 
   y += CLIENT_H + 6;
 
-  // =====================================================
+  // ══════════════════════════════════════════════════════════════
   // TABELA DE ITENS
-  // =====================================================
+  // ══════════════════════════════════════════════════════════════
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...NAVY);
   doc.text('DESCRICAO DOS ITENS', ML, y);
   y += 3;
+  doc.setFont('helvetica', 'normal');
   doc.setTextColor(0, 0, 0);
 
   const tableBody = quote.items.map((item, i) => {
     const hasDims = item.width && item.height;
     const area = hasDims ? (item.width! * item.height! / 1_000_000) : null;
-    // Sem emoji — encoding-safe
-    const dimStr = hasDims
-      ? `${item.width}mm x ${item.height}mm\n(${area!.toFixed(4)} m2)`
-      : '-';
-    const loc = item.location ? `\nLocal: ${safe(item.location)}` : '';
-    const desc = safe(item.description) + loc;
+    // Sem emoji — usa texto puro para evitar chars fora Latin-1
+    const dimStr = hasDims ? `${item.width}mm x ${item.height}mm\n(${area!.toFixed(4)} m2)` : '-';
+    const loc = item.location ? `\nLocal: ${t(item.location)}` : '';
+    const desc = t(item.description) + loc;
     return [
       String(i + 1),
       desc,
@@ -219,14 +214,26 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string): Pro
     head: [['#', 'Descricao', 'Dimensoes', 'Qtd.', 'Valor Unit.', 'Total']],
     body: tableBody,
     theme: 'grid',
+    // Bug 2 fix: font explícito em todas as seções do autoTable
+    styles: {
+      font: 'helvetica',
+      fontStyle: 'normal',
+      overflow: 'linebreak',
+    },
     headStyles: {
-      fillColor: [...NAVY] as [number, number, number],
+      fillColor: NAVY,
       textColor: 255,
       fontStyle: 'bold',
       fontSize: 8.5,
       halign: 'center',
+      font: 'helvetica',
     },
-    bodyStyles: { fontSize: 9, valign: 'middle' },
+    bodyStyles: {
+      fontSize: 9,
+      valign: 'middle',
+      font: 'helvetica',
+      fontStyle: 'normal',
+    },
     alternateRowStyles: { fillColor: [248, 250, 252] },
     columnStyles: {
       0: { cellWidth: 9,  halign: 'center' },
@@ -235,14 +242,18 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string): Pro
       4: { cellWidth: 28, halign: 'right' },
       5: { cellWidth: 28, halign: 'right', fontStyle: 'bold' },
     },
+    // Bug 2 fix: garante que o font é resetado para Helvetica em cada célula
+    didParseCell: (data) => {
+      data.cell.styles.font = 'helvetica';
+    },
     margin: { left: ML, right: MR },
   });
 
   y = (doc as any).lastAutoTable.finalY + 4;
 
-  // =====================================================
+  // ══════════════════════════════════════════════════════════════
   // TOTAL
-  // =====================================================
+  // ══════════════════════════════════════════════════════════════
   doc.setFillColor(...NAVY);
   doc.roundedRect(ML, y, CW, 12, 2, 2, 'F');
   doc.setTextColor(...WHITE);
@@ -251,17 +262,18 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string): Pro
   doc.text('VALOR TOTAL:', ML + 5, y + 8);
   doc.text(fmt(quote.total), PW - MR - 3, y + 8, { align: 'right' });
   doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'normal');
   y += 18;
 
-  // =====================================================
-  // CONDICOES / OBSERVACOES
-  // =====================================================
-  const condLines: string[] = [
+  // ══════════════════════════════════════════════════════════════
+  // CONDIÇÕES
+  // ══════════════════════════════════════════════════════════════
+  const condLines = [
     '* Proposta valida por 7 (sete) dias uteis.',
     '* Condicoes de pagamento: a combinar.',
+    ...(userWhatsapp ? [`* WhatsApp para contato: ${t(userWhatsapp)}`] : []),
+    ...(quote.notes ? [`* Obs.: ${t(quote.notes)}`] : []),
   ];
-  if (userWhatsapp) condLines.push(`* WhatsApp para contato: ${safe(userWhatsapp)}`);
-  if (quote.notes)  condLines.push(`* Obs.: ${safe(quote.notes)}`);
 
   const condH = condLines.length * 5.5 + 12;
   doc.setFillColor(...LIGHT);
@@ -273,27 +285,26 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string): Pro
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(50, 50, 50);
   condLines.forEach((line, idx) => {
-    doc.text(safe(line), ML + 4, y + 9 + idx * 5.5);
+    doc.text(line, ML + 4, y + 9 + idx * 5.5);
   });
   y += condH + 8;
 
-  // =====================================================
+  // ══════════════════════════════════════════════════════════════
   // ASSINATURAS
-  // =====================================================
+  // ══════════════════════════════════════════════════════════════
   if (y > 258) { doc.addPage(); y = 20; }
   else y = Math.max(y, 258);
 
   doc.setDrawColor(150, 150, 150);
   doc.setLineWidth(0.3);
-  doc.line(ML + 5,      y, ML + 75,          y);
-  doc.line(PW - MR - 75, y, PW - MR - 5,     y);
+  doc.line(ML + 5, y, ML + 75, y);
+  doc.line(PW - MR - 75, y, PW - MR - 5, y);
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(80, 80, 80);
   doc.text('Cliente', ML + 40, y + 5, { align: 'center' });
-  doc.text(safe(co.name || 'Empresa'), PW - MR - 40, y + 5, { align: 'center' });
+  doc.text(t(co.name || 'Empresa'), PW - MR - 40, y + 5, { align: 'center' });
 
-  // Rodape
   doc.setFontSize(7);
   doc.setTextColor(160, 160, 160);
   doc.text(
