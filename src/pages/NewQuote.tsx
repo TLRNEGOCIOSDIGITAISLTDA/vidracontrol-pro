@@ -127,6 +127,7 @@ const NewQuote = () => {
     },
   ]);
   const [commission, setCommission] = useState<number>(0);
+  const [rtName, setRtName] = useState('');
   const [nfRequired, setNfRequired] = useState(false);
   const [nfPercent, setNfPercent] = useState<number>(0);
   const [showCompany, setShowCompany] = useState(false);
@@ -218,6 +219,7 @@ const NewQuote = () => {
       notes: notes.trim() || undefined,
       commission: commission > 0 ? commission : undefined,
       nfPercent: nfRequired && nfPercent > 0 ? nfPercent : undefined,
+      rtName: rtName.trim() || undefined,
     });
     toast.success("Orçamento criado!");
     navigate(`/app/orcamentos?novo=${quote.id}`);
@@ -304,7 +306,7 @@ const NewQuote = () => {
             <Label className="text-base font-bold">Custos do Contrato</Label>
 
             <div>
-              <Label className="text-xs">Comissão (%)</Label>
+              <Label className="text-xs">RT (Responsável Técnico) (%)</Label>
               <div className="flex items-center gap-2 mt-1">
                 <Input
                   type="number"
@@ -320,9 +322,16 @@ const NewQuote = () => {
                 <span className="text-sm text-muted-foreground">
                   {commission > 0 && total > 0
                     ? `= ${(total * commission / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`
-                    : "nenhuma comissão"}
+                    : "sem RT"}
                 </span>
               </div>
+              <Input
+                className="mt-2"
+                placeholder="Ex: Escritório Silva Arquitetura"
+                value={rtName}
+                onChange={e => setRtName(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Nome do RT / Escritório (opcional)</p>
             </div>
 
             <div>

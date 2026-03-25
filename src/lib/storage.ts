@@ -55,6 +55,7 @@ export async function getQuotes(): Promise<Quote[]> {
     status: (r.status as any) || 'orcado',
     commission: (r.company_info as any)?._commission ? Number((r.company_info as any)._commission) : undefined,
     nfPercent: (r.company_info as any)?._nfPct ? Number((r.company_info as any)._nfPct) : undefined,
+    rtName: (r as any).rt_name || undefined,
     items: (items || []).filter(i => i.quote_id === r.id).map(i => ({
       id: i.id,
       type: i.type as any,
@@ -147,6 +148,7 @@ export async function addQuote(quote: Omit<Quote, 'id' | 'createdAt'>): Promise<
       ...(quote.commission ? { _commission: quote.commission } : {}),
       ...(quote.nfPercent ? { _nfPct: quote.nfPercent } : {}),
     } as any,
+    rt_name: quote.rtName || null,
     user_id: uid,
   } as any).select().single();
 
@@ -604,6 +606,7 @@ export async function updateQuote(quote: Quote): Promise<void> {
       ...(quote.commission ? { _commission: quote.commission } : {}),
       ...(quote.nfPercent ? { _nfPct: quote.nfPercent } : {}),
     } as any,
+    rt_name: quote.rtName || null,
   }).eq('id', quote.id).eq('user_id', uid);                           // [SEC] valida dono
 
   // Deleta e recria os itens (sempre restringe ao user)

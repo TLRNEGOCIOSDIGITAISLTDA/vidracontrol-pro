@@ -132,7 +132,7 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string): Pro
   // ══════════════════════════════════════════════════════════════
   // BLOCO DO CLIENTE — 2 colunas
   // ══════════════════════════════════════════════════════════════
-  const CLIENT_H = 32;
+  const CLIENT_H = quote.rtName ? 38 : 32;
   doc.setFillColor(...LIGHT);
   doc.roundedRect(ML, y - 3, CW, CLIENT_H, 2, 2, 'F');
 
@@ -154,6 +154,7 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string): Pro
   ([
     ['Cliente:', t(quote.clientName)],
     ...(quote.clientPhone ? [['Telefone:', t(quote.clientPhone)]] : []),
+    ...(quote.rtName ? [['Resp. Tecnico:', t(quote.rtName)]] : []),
   ] as [string, string][]).forEach(([label, val]) => {
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');

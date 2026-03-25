@@ -57,6 +57,7 @@ export function QuoteSendMenu({ quote, onStatusChange, size = "sm" }: Props) {
       "",
       `*Valor total: ${fmt(quote.total)}*`,
       `Validade: 7 dias uteis`,
+      ...(quote.rtName ? [`Responsavel Tecnico: ${quote.rtName}`] : []),
       "",
       `Qualquer duvida estou a disposicao!`,
       `Att, ${companyName}`,

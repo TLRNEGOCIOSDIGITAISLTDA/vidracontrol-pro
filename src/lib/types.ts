@@ -237,4 +237,6 @@ export interface Quote {
   commission?: number;
   /** % da Nota Fiscal sobre o total da obra */
   nfPercent?: number;
+  /** Nome do Responsável Técnico / Escritório */
+  rtName?: string;
 }
