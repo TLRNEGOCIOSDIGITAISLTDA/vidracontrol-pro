@@ -192,6 +192,19 @@ export interface UserProfile {
   userId: string;
   whatsapp: string;
   fullName: string;
+  /** Unidade de medida padrão: 'cm' ou 'mm' */
+  defaultUnit: 'cm' | 'mm';
+}
+
+export interface RT {
+  id: string;
+  userId: string;
+  name: string;
+  whatsapp: string;
+  email: string;
+  defaultPercentage: number;
+  active: boolean;
+  createdAt: string;
 }
 
 export type ProductCategory = 'Vidro' | 'Espelho' | 'Esquadria' | 'Mão de Obra' | 'Outro';

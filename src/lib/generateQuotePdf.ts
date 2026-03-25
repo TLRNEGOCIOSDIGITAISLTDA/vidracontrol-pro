@@ -38,7 +38,7 @@ const ACCENT = [51, 102, 204]  as [number, number, number];
 const LIGHT  = [241, 245, 249] as [number, number, number];
 const WHITE  = [255, 255, 255] as [number, number, number];
 
-export async function generateQuotePdf(quote: Quote, userWhatsapp?: string): Promise<jsPDF> {
+export async function generateQuotePdf(quote: Quote, userWhatsapp?: string, displayUnit: 'cm' | 'mm' = 'mm'): Promise<jsPDF> {
   const doc = new jsPDF({ unit: 'mm', format: 'a4', putOnlyUsedFonts: true });
 
   // Garante que o font padrão é Helvetica com encoding Latin-1 desde o início
@@ -196,8 +196,10 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string): Pro
   const tableBody = quote.items.map((item, i) => {
     const hasDims = item.width && item.height;
     const area = hasDims ? (item.width! * item.height! / 1_000_000) : null;
-    // Sem emoji — usa texto puro para evitar chars fora Latin-1
-    const dimStr = hasDims ? `${item.width}mm x ${item.height}mm\n(${area!.toFixed(4)} m2)` : '-';
+    // Converte mm armazenado para a unidade de exibição escolhida
+    const dw = hasDims ? (displayUnit === 'cm' ? item.width! / 10 : item.width!) : 0;
+    const dh = hasDims ? (displayUnit === 'cm' ? item.height! / 10 : item.height!) : 0;
+    const dimStr = hasDims ? `${dw}${displayUnit} x ${dh}${displayUnit}\n(${area!.toFixed(4)} m2)` : '-';
     const loc = item.location ? `\nLocal: ${t(item.location)}` : '';
     const desc = t(item.description) + loc;
     return [

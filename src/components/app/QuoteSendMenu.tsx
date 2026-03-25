@@ -37,11 +37,14 @@ export function QuoteSendMenu({ quote, onStatusChange, size = "sm" }: Props) {
 
     const profile = await getProfile();
     const companyName = quote.companyInfo?.name || profile?.fullName || "Empresa";
+    const displayUnit = profile?.defaultUnit ?? 'mm';
 
     const itemLines = quote.items
       .map((item) => {
         const hasDims = item.width && item.height;
-        const dimsStr = hasDims ? ` (${item.width}mm×${item.height}mm)` : "";
+        const dw = hasDims ? (displayUnit === 'cm' ? item.width! / 10 : item.width!) : 0;
+        const dh = hasDims ? (displayUnit === 'cm' ? item.height! / 10 : item.height!) : 0;
+        const dimsStr = hasDims ? ` (${dw}${displayUnit}×${dh}${displayUnit})` : "";
         return `• ${item.description}${dimsStr} — ${item.quantity}x ${fmt(item.unitPrice)} = ${fmt(item.total)}`;
       })
       .join("\n");
@@ -73,7 +76,8 @@ export function QuoteSendMenu({ quote, onStatusChange, size = "sm" }: Props) {
     const profile = await getProfile();
     const whatsapp = profile?.whatsapp ? maskWhatsApp(profile.whatsapp) : "";
 
-    const doc = await generateQuotePdf(quote, whatsapp);
+    const displayUnit = profile?.defaultUnit ?? 'mm';
+    const doc = await generateQuotePdf(quote, whatsapp, displayUnit);
     const fileName = `orcamento-${quote.clientName.replace(/\s+/g, "-").toLowerCase()}-${quote.id.slice(0, 8)}.pdf`;
 
     await onStatusChange(quote.id, "enviado");

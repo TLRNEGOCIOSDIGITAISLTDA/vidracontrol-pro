@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AppHeader from "@/components/app/AppHeader";
-import { addQuote, getCompanyInfo, saveCompanyInfo, getProducts } from "@/lib/storage";
-import { QuoteItem, QuoteItemType, QUOTE_ITEM_LABELS, CompanyInfo, Product } from "@/lib/types";
+import { addQuote, getCompanyInfo, saveCompanyInfo, getProducts, getProfile, getRTs } from "@/lib/storage";
+import { QuoteItem, QuoteItemType, QUOTE_ITEM_LABELS, CompanyInfo, Product, RT } from "@/lib/types";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -98,12 +98,14 @@ const ProductSearch = ({
   );
 };
 
-// Extende QuoteItem com unidade do catálogo (não salva no banco)
-type ItemLocal = QuoteItem & { _catalogUnit?: string };
+// Extende QuoteItem com unidade do catálogo e unidade de exibição (não salva no banco)
+// width/height são SEMPRE em mm internamente
+type ItemLocal = QuoteItem & { _catalogUnit?: string; _unit?: 'cm' | 'mm' };
 
 const calcItemTotal = (item: ItemLocal): number => {
   if (item._catalogUnit === 'm²' && item.width && item.height) {
-    const area = (item.width * item.height / 10_000) * item.quantity;
+    // width e height já em mm → m² = mm × mm / 1_000_000
+    const area = (item.width * item.height / 1_000_000) * item.quantity;
     return area * item.unitPrice;
   }
   return item.quantity * item.unitPrice;
@@ -132,11 +134,19 @@ const NewQuote = () => {
   const [nfPercent, setNfPercent] = useState<number>(0);
   const [showCompany, setShowCompany] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
+  const [defaultUnit, setDefaultUnit] = useState<'cm' | 'mm'>('mm');
+  const [rts, setRts] = useState<RT[]>([]);
+  const [rtQuery, setRtQuery] = useState('');
+  const [showRtSuggestions, setShowRtSuggestions] = useState(false);
 
-  // Load company info e catálogo
+  // Load company info, catálogo, perfil e RTs
   useEffect(() => {
     getCompanyInfo().then(setCompany);
     getProducts().then(setCatalogProducts);
+    getProfile().then(p => {
+      if (p?.defaultUnit) setDefaultUnit(p.defaultUnit);
+    });
+    getRTs().then(list => setRts(list.filter(r => r.active)));
   }, []);
 
   const addItem = () => {
@@ -149,6 +159,7 @@ const NewQuote = () => {
         quantity: 1,
         unitPrice: 0,
         total: 0,
+        _unit: defaultUnit,
       },
     ]);
   };
@@ -325,13 +336,49 @@ const NewQuote = () => {
                     : "sem RT"}
                 </span>
               </div>
-              <Input
-                className="mt-2"
-                placeholder="Ex: Escritório Silva Arquitetura"
-                value={rtName}
-                onChange={e => setRtName(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground mt-1">Nome do RT / Escritório (opcional)</p>
+              <div className="relative mt-2">
+                <Input
+                  placeholder="Ex: Escritório Silva Arquitetura"
+                  value={rtName}
+                  onChange={e => {
+                    setRtName(e.target.value);
+                    setRtQuery(e.target.value);
+                    setShowRtSuggestions(true);
+                  }}
+                  onFocus={() => setShowRtSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowRtSuggestions(false), 150)}
+                  autoComplete="off"
+                />
+                {showRtSuggestions && rtQuery.trim() && (() => {
+                  const filtered = rts.filter(r =>
+                    r.name.toLowerCase().includes(rtQuery.toLowerCase())
+                  );
+                  if (!filtered.length) return null;
+                  return (
+                    <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-elevated py-1 max-h-48 overflow-y-auto">
+                      {filtered.map(r => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+                          onMouseDown={() => {
+                            setRtName(r.name);
+                            setRtQuery(r.name);
+                            if (r.defaultPercentage > 0) setCommission(r.defaultPercentage);
+                            setShowRtSuggestions(false);
+                          }}
+                        >
+                          <span className="font-medium">{r.name}</span>
+                          {r.defaultPercentage > 0 && (
+                            <span className="text-xs text-muted-foreground ml-2">{r.defaultPercentage}% RT</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Nome do RT / Escritório (opcional — busca dos RTs cadastrados)</p>
             </div>
 
             <div>
@@ -433,36 +480,72 @@ const NewQuote = () => {
                   </div>
 
                   {/* Campos de dimensão: m² do catálogo OU item livre */}
-                  {(item._catalogUnit === 'm²' || !item._catalogUnit) && (
-                    <div className="grid grid-cols-2 gap-3">
+                  {(item._catalogUnit === 'm²' || !item._catalogUnit) && (() => {
+                    const unit = item._unit ?? defaultUnit;
+                    // Converte mm armazenado → valor de exibição
+                    const toDisplay = (mm: number | undefined) =>
+                      mm !== undefined ? (unit === 'cm' ? mm / 10 : mm) : undefined;
+                    // Converte input → mm para armazenar
+                    const toMm = (v: number) => unit === 'cm' ? v * 10 : v;
+                    return (
                       <div>
-                        <Label className="text-xs">Largura (cm)</Label>
-                        <Input
-                          className="mt-1"
-                          type="number"
-                          min={0}
-                          step="0.1"
-                          value={item.width || ""}
-                          onChange={e => updateItem(item.id, { width: parseFloat(e.target.value) || undefined })}
-                          inputMode="decimal"
-                          placeholder="120"
-                        />
+                        {/* Toggle cm/mm */}
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-muted-foreground">Dimensões</span>
+                          <div className="flex rounded-md border border-border overflow-hidden text-xs">
+                            {(['mm', 'cm'] as const).map(u => (
+                              <button
+                                key={u}
+                                type="button"
+                                onClick={() => updateItem(item.id, { _unit: u })}
+                                className={`px-2.5 py-0.5 font-medium transition-colors ${
+                                  unit === u
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'text-muted-foreground hover:bg-muted'
+                                }`}
+                              >
+                                {u}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label className="text-xs">Largura ({unit})</Label>
+                            <Input
+                              className="mt-1"
+                              type="number"
+                              min={0}
+                              step={unit === 'cm' ? "0.1" : "1"}
+                              value={toDisplay(item.width) ?? ""}
+                              onChange={e => {
+                                const v = parseFloat(e.target.value);
+                                updateItem(item.id, { width: isNaN(v) ? undefined : toMm(v) });
+                              }}
+                              inputMode="decimal"
+                              placeholder={unit === 'cm' ? "120" : "1200"}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Altura ({unit})</Label>
+                            <Input
+                              className="mt-1"
+                              type="number"
+                              min={0}
+                              step={unit === 'cm' ? "0.1" : "1"}
+                              value={toDisplay(item.height) ?? ""}
+                              onChange={e => {
+                                const v = parseFloat(e.target.value);
+                                updateItem(item.id, { height: isNaN(v) ? undefined : toMm(v) });
+                              }}
+                              inputMode="decimal"
+                              placeholder={unit === 'cm' ? "80" : "800"}
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <Label className="text-xs">Altura (cm)</Label>
-                        <Input
-                          className="mt-1"
-                          type="number"
-                          min={0}
-                          step="0.1"
-                          value={item.height || ""}
-                          onChange={e => updateItem(item.id, { height: parseFloat(e.target.value) || undefined })}
-                          inputMode="decimal"
-                          placeholder="80"
-                        />
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -495,37 +578,39 @@ const NewQuote = () => {
                   </div>
 
                   {/* Metragem — aparece sempre que largura e altura estão preenchidas */}
-                  {item.width && item.height ? (
-                    <div className="rounded-lg bg-primary/5 px-3 py-2 space-y-0.5">
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Metragem</span>
-                        <span className="font-medium text-foreground">
-                          {(item.width * item.height / 10_000 * item.quantity).toFixed(4)} m²
-                          {item.quantity > 1 && (
-                            <span className="text-muted-foreground font-normal">
-                              {' '}({item.quantity} × {(item.width * item.height / 10_000).toFixed(4)} m²)
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                      {item._catalogUnit === 'm²' && (
+                  {item.width && item.height ? (() => {
+                    const areaPorPeca = item.width * item.height / 1_000_000; // mm² → m²
+                    const areaTotal = areaPorPeca * item.quantity;
+                    return (
+                      <div className="rounded-lg bg-primary/5 px-3 py-2 space-y-0.5">
                         <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>Cálculo</span>
-                          <span>
-                            {(item.width * item.height / 10_000 * item.quantity).toFixed(4)} m² × {fmt(item.unitPrice)}/m²
-                          </span>
-                        </div>
-                      )}
-                      {item._catalogUnit !== 'm²' && item.unitPrice > 0 && (
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>Valor/m²</span>
+                          <span>Metragem</span>
                           <span className="font-medium text-foreground">
-                            {fmt(item.unitPrice / (item.width! * item.height! / 10_000))}/m²
+                            {areaTotal.toFixed(4)} m²
+                            {item.quantity > 1 && (
+                              <span className="text-muted-foreground font-normal">
+                                {' '}({item.quantity} × {areaPorPeca.toFixed(4)} m²)
+                              </span>
+                            )}
                           </span>
                         </div>
-                      )}
-                    </div>
-                  ) : null}
+                        {item._catalogUnit === 'm²' && (
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Cálculo</span>
+                            <span>{areaTotal.toFixed(4)} m² × {fmt(item.unitPrice)}/m²</span>
+                          </div>
+                        )}
+                        {item._catalogUnit !== 'm²' && item.unitPrice > 0 && (
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Valor/m²</span>
+                            <span className="font-medium text-foreground">
+                              {fmt(item.unitPrice / areaPorPeca)}/m²
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })() : null}
 
                   <div className="text-right text-sm font-bold text-primary">
                     Subtotal: {fmt(item.total)}

@@ -514,25 +514,82 @@ export async function getProfile(): Promise<UserProfile | null> {
   const { data } = await supabase.from('profiles' as any).select('*').eq('user_id', uid).limit(1).single();
   if (!data) return null;
   const d = data as any;
-  return { id: d.id, userId: d.user_id, whatsapp: d.whatsapp, fullName: d.full_name };
+  return {
+    id: d.id,
+    userId: d.user_id,
+    whatsapp: d.whatsapp,
+    fullName: d.full_name,
+    defaultUnit: (d.default_unit === 'cm' ? 'cm' : 'mm') as 'cm' | 'mm',
+  };
 }
 
-export async function saveProfile(profile: { whatsapp: string; fullName: string }) {
+export async function saveProfile(profile: { whatsapp: string; fullName: string; defaultUnit?: 'cm' | 'mm' }) {
   const uid = await getUserId();
   const { data: existing } = await supabase.from('profiles' as any).select('id').eq('user_id', uid).limit(1).single();
+  const payload: Record<string, unknown> = {
+    whatsapp: profile.whatsapp,
+    full_name: profile.fullName,
+    updated_at: new Date().toISOString(),
+  };
+  if (profile.defaultUnit) payload.default_unit = profile.defaultUnit;
   if (existing) {
-    await supabase.from('profiles' as any).update({
-      whatsapp: profile.whatsapp,
-      full_name: profile.fullName,
-      updated_at: new Date().toISOString(),
-    } as any).eq('id', (existing as any).id).eq('user_id', uid);      // [SEC] duplo filtro
+    await supabase.from('profiles' as any).update(payload as any).eq('id', (existing as any).id).eq('user_id', uid);
   } else {
-    await supabase.from('profiles' as any).insert({
-      user_id: uid,
-      whatsapp: profile.whatsapp,
-      full_name: profile.fullName,
-    } as any);
+    await supabase.from('profiles' as any).insert({ user_id: uid, ...payload } as any);
   }
+}
+
+// ---- Responsáveis Técnicos ----
+
+import type { RT } from './types';
+
+export async function getRTs(): Promise<RT[]> {
+  const uid = await getUserId();
+  const { data } = await supabase
+    .from('responsaveis_tecnicos' as any)
+    .select('*')
+    .eq('user_id', uid)
+    .order('name');
+  return ((data as any[]) || []).map((r: any) => ({
+    id: r.id,
+    userId: r.user_id,
+    name: r.name,
+    whatsapp: r.whatsapp || '',
+    email: r.email || '',
+    defaultPercentage: Number(r.default_percentage) || 0,
+    active: r.active,
+    createdAt: r.created_at,
+  }));
+}
+
+export async function addRT(rt: Omit<RT, 'id' | 'userId' | 'createdAt'>): Promise<RT> {
+  const uid = await getUserId();
+  const { data, error } = await supabase
+    .from('responsaveis_tecnicos' as any)
+    .insert({
+      user_id: uid,
+      name: rt.name,
+      whatsapp: rt.whatsapp,
+      email: rt.email,
+      default_percentage: rt.defaultPercentage,
+      active: rt.active,
+    } as any)
+    .select()
+    .single();
+  if (error || !data) throw new Error(error?.message || 'Erro ao cadastrar RT');
+  const d = data as any;
+  return { id: d.id, userId: d.user_id, name: d.name, whatsapp: d.whatsapp || '', email: d.email || '', defaultPercentage: Number(d.default_percentage) || 0, active: d.active, createdAt: d.created_at };
+}
+
+export async function updateRT(id: string, updates: Partial<Omit<RT, 'id' | 'userId' | 'createdAt'>>): Promise<void> {
+  const uid = await getUserId();
+  const payload: Record<string, unknown> = {};
+  if (updates.name !== undefined) payload.name = updates.name;
+  if (updates.whatsapp !== undefined) payload.whatsapp = updates.whatsapp;
+  if (updates.email !== undefined) payload.email = updates.email;
+  if (updates.defaultPercentage !== undefined) payload.default_percentage = updates.defaultPercentage;
+  if (updates.active !== undefined) payload.active = updates.active;
+  await supabase.from('responsaveis_tecnicos' as any).update(payload as any).eq('id', id).eq('user_id', uid);
 }
 
 // ---- Products ----
