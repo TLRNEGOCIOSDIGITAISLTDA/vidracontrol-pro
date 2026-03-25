@@ -543,7 +543,7 @@ const NewQuote = () => {
                 <span className="text-sm text-muted-foreground">Valor Total</span>
                 <span className="text-xl font-bold text-primary">{fmt(total)}</span>
               </div>
-              {(commission > 0 || (nfRequired && nfPercent > 0)) && (
+              {(commission > 0 || (nfRequired && nfPercent > 0)) && total > 0 && (
                 <div className="border-t border-primary/20 pt-2 space-y-1">
                   {commission > 0 && (
                     <div className="flex justify-between text-sm">
