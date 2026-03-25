@@ -318,10 +318,10 @@ const Signup = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="companyPhone">Telefone comercial</Label>
+            <Label htmlFor="companyPhone">Telefone / WhatsApp</Label>
             <Input
               id="companyPhone"
-              placeholder="(41) 3333-4444"
+              placeholder="(41) 99999-9999"
               value={companyPhone}
               onChange={e => setCompanyPhone(maskPhone(e.target.value))}
               inputMode="tel"
