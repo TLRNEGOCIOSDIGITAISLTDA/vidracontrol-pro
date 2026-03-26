@@ -630,7 +630,7 @@ const NewQuote = () => {
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>Total de m²</span>
                 <span className="font-bold text-foreground">
-                  {items.reduce((s, i) => s + ((i.width || 0) * (i.height || 0) / 10_000 * i.quantity), 0).toFixed(4)} m²
+                  {items.reduce((s, i) => s + ((i.width || 0) * (i.height || 0) / 1_000_000 * i.quantity), 0).toFixed(4)} m²
                 </span>
               </div>
               <div className="flex justify-between">
