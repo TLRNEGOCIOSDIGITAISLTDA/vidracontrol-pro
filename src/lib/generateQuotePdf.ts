@@ -104,7 +104,7 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string, disp
   doc.setTextColor(...WHITE);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
-  doc.text(`Orcamento N: ${t(quoteNum)}`, PW - MR, 13, { align: 'right' });
+  doc.text(t(`Orcamento No: ${quoteNum}`), PW - MR, 13, { align: 'right' });
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.text(`Data: ${date}`, PW - MR, 19, { align: 'right' });
@@ -168,7 +168,7 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string, disp
   const RX = ML + CW / 2 + 4;
   let ry = y + 10;
   ([
-    ['N do Orcamento:', t(quoteNum)],
+    [t('No do Orcamento:'), t(quoteNum)],
     ['Data:', date],
     ...(quote.jobType ? [['Tipo:', t(quote.jobType)]] : []),
   ] as [string, string][]).forEach(([label, val]) => {
@@ -217,7 +217,6 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string, disp
     head: [['#', 'Descricao', 'Dimensoes', 'Qtd.', 'Valor Unit.', 'Total']],
     body: tableBody,
     theme: 'grid',
-    // Bug 2 fix: font explícito em todas as seções do autoTable
     styles: {
       font: 'helvetica',
       fontStyle: 'normal',
@@ -245,7 +244,12 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string, disp
       4: { cellWidth: 28, halign: 'right' },
       5: { cellWidth: 28, halign: 'right', fontStyle: 'bold' },
     },
-    // Bug 2 fix: garante que o font é resetado para Helvetica em cada célula
+    // Garante Helvetica imediatamente antes de cada célula ser renderizada.
+    // Necessário para jspdf-autotable v5, que pode ignorar 'font' nos styles.
+    willDrawCell: (data) => {
+      const bold = data.cell.styles.fontStyle === 'bold';
+      doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    },
     didParseCell: (data) => {
       data.cell.styles.font = 'helvetica';
     },

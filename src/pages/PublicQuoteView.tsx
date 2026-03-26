@@ -31,6 +31,7 @@ const PublicQuoteView = () => {
 
       const q: Quote = {
         id: row.id,
+        quoteNumber: (row as any).quote_number || undefined,
         clientName: row.client_name,
         clientPhone: (row as any).client_phone || '',
         jobType: row.job_type || '',
@@ -59,9 +60,9 @@ const PublicQuoteView = () => {
   const fmt = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     if (!quote) return;
-    const doc = generateQuotePdf(quote);
+    const doc = await generateQuotePdf(quote);
     doc.save(`orcamento-${quote.clientName.replace(/\s+/g, '-').toLowerCase()}.pdf`);
   };
 
