@@ -1,15 +1,15 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
-import { Trash2, Send, CheckCircle2, XCircle, Loader2, Circle, Pencil, Plus } from "lucide-react";
+import { Trash2, Send, CheckCircle2, XCircle, Loader2, Circle, Pencil, Plus, X, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AppHeader from "@/components/app/AppHeader";
-import { getQuote, getProfile } from "@/lib/storage";
+import { getQuote, getProfile, getProducts, getRTs } from "@/lib/storage";
 import { useData } from "@/lib/DataContext";
-import { Quote, QuoteItem, QuoteItemType, QuoteStatus, QUOTE_ITEM_LABELS, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from "@/lib/types";
+import { Quote, QuoteItem, QuoteItemType, QuoteStatus, QUOTE_ITEM_LABELS, Product, RT } from "@/lib/types";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { generateQuotePdf } from "@/lib/generateQuotePdf";
@@ -26,11 +26,10 @@ const FLOW_STEPS: { status: QuoteStatus; label: string }[] = [
 
 function getFlowIndex(status: QuoteStatus): number {
   if (status === 'perdido') return -1;
-  if (status === 'aguardando') return 1; // trata como enviado no fluxo visual
+  if (status === 'aguardando') return 1;
   return FLOW_STEPS.findIndex(s => s.status === status);
 }
 
-// Calcula o total do item: usa m² se tiver dimensões, senão qtd × unitPrice
 // width e height são SEMPRE em mm no banco → divisor 1_000_000 para converter em m²
 function calcItemTotal(item: QuoteItem): number {
   if (item.width && item.height) {
@@ -39,12 +38,89 @@ function calcItemTotal(item: QuoteItem): number {
   return item.quantity * item.unitPrice;
 }
 
+// Extende QuoteItem com unidade do catálogo e unidade de exibição (não salva no banco)
+type ItemLocal = QuoteItem & { _catalogUnit?: string; _unit?: 'cm' | 'mm' };
+
+// Busca de produto no catálogo (idêntico ao NewQuote)
+const ProductSearch = ({
+  products,
+  onSelect,
+}: {
+  products: Product[];
+  onSelect: (p: Product) => void;
+}) => {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const filtered = query.trim()
+    ? products.filter(p =>
+        p.name.toLowerCase().includes(query.toLowerCase()) ||
+        p.category.toLowerCase().includes(query.toLowerCase())
+      ).slice(0, 8)
+    : [];
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const select = (p: Product) => {
+    onSelect(p);
+    setQuery("");
+    setOpen(false);
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+        <Input
+          className="pl-8 text-sm h-9"
+          placeholder="Buscar produto do catálogo..."
+          value={query}
+          onChange={e => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+        />
+        {query && (
+          <button
+            type="button"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+            onClick={() => { setQuery(""); setOpen(false); }}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      {open && filtered.length > 0 && (
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-popover border border-border rounded-lg shadow-lg overflow-hidden">
+          {filtered.map(p => (
+            <button
+              key={p.id}
+              type="button"
+              className="w-full text-left px-3 py-2.5 hover:bg-muted flex items-center justify-between gap-2"
+              onMouseDown={() => select(p)}
+            >
+              <span className="text-sm font-medium truncate">{p.name}</span>
+              <span className="text-xs text-muted-foreground shrink-0">
+                {p.unitPrice.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} / {p.unit}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface EditData {
   clientName: string;
   clientPhone: string;
   jobType: string;
   notes: string;
-  items: QuoteItem[];
 }
 
 const QuoteDetail = () => {
@@ -54,10 +130,21 @@ const QuoteDetail = () => {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [sending, setSending] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [editData, setEditData] = useState<EditData | null>(null);
   const [saving, setSaving] = useState(false);
-  const [editUnit, setEditUnit] = useState<'cm' | 'mm'>('mm');
   const printRef = useRef<HTMLDivElement>(null);
+
+  // ── Dados de edição ──────────────────────────────────────────
+  const [editData, setEditData] = useState<EditData | null>(null);
+  const [editItems, setEditItems] = useState<ItemLocal[]>([]);
+  const [editUnit, setEditUnit] = useState<'cm' | 'mm'>('mm');
+  const [editCommission, setEditCommission] = useState<number>(0);
+  const [editNfRequired, setEditNfRequired] = useState(false);
+  const [editNfPercent, setEditNfPercent] = useState<number>(0);
+  const [editRtName, setEditRtName] = useState('');
+  const [editRtQuery, setEditRtQuery] = useState('');
+  const [showEditRtSuggestions, setShowEditRtSuggestions] = useState(false);
+  const [rts, setRts] = useState<RT[]>([]);
+  const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -72,6 +159,8 @@ const QuoteDetail = () => {
     getProfile().then(p => {
       if (p?.defaultUnit) setEditUnit(p.defaultUnit);
     });
+    getProducts().then(setCatalogProducts);
+    getRTs().then(list => setRts(list.filter(r => r.active)));
   }, [id, navigate]);
 
   const fmt = (v: number) =>
@@ -92,36 +181,29 @@ const QuoteDetail = () => {
 
   const handleSendWhatsApp = async () => {
     if (!quote || !id) return;
-
     const clientPhone = quote.clientPhone?.replace(/\D/g, '');
     if (!clientPhone || clientPhone.length !== 11) {
       toast.error("Telefone do cliente não cadastrado. Edite o orçamento e adicione.");
       return;
     }
-
     setSending(true);
     try {
       const profile = await getProfile();
       const userName = profile?.fullName || quote.companyInfo.name || 'Empresa';
-
       const doc = await generateQuotePdf(quote, profile?.whatsapp ? maskWhatsApp(profile.whatsapp) : '');
       const pdfBlob = doc.output('blob');
       const fileName = `orcamento-${quote.clientName.replace(/\s+/g, '-').toLowerCase()}-${id.slice(0, 8)}.pdf`;
-
       try {
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('quote-pdfs')
           .upload(fileName, pdfBlob, { contentType: 'application/pdf', upsert: true });
-
         if (!uploadError && uploadData) {
           supabase.storage.from('quote-pdfs').getPublicUrl(fileName);
         }
       } catch { /* fallback */ }
-
       const appUrl = `${window.location.origin}/orcamento-publico/${id}`;
       const message = `Olá ${quote.clientName}! Segue o orçamento conforme solicitado: ${appUrl}\n\nQualquer dúvida estou à disposição!\nAtt, ${userName}`;
       window.open(`https://wa.me/55${clientPhone}?text=${encodeURIComponent(message)}`, '_blank');
-
       await changeQuoteStatus(id, 'enviado');
       toast.success('Orçamento enviado! Status alterado para "Enviado".');
       navigate('/app/orcamentos');
@@ -146,7 +228,9 @@ const QuoteDetail = () => {
     toast("Orçamento marcado como Perdido.");
   };
 
-  // ===== EDIT MODE =====
+  // ═══════════════════════════════════════════════════════════
+  // EDIT MODE — idêntico ao formulário de criação (NewQuote)
+  // ═══════════════════════════════════════════════════════════
 
   const startEdit = () => {
     if (!quote) return;
@@ -155,46 +239,69 @@ const QuoteDetail = () => {
       clientPhone: quote.clientPhone || '',
       jobType: quote.jobType || '',
       notes: quote.notes || '',
-      items: quote.items.map(i => ({ ...i })),
     });
+    // Converte QuoteItem[] → ItemLocal[] preservando todos os campos
+    setEditItems(quote.items.map(i => ({ ...i, _unit: editUnit })));
+    setEditCommission(quote.commission ?? 0);
+    setEditNfRequired(!!(quote.nfPercent && quote.nfPercent > 0));
+    setEditNfPercent(quote.nfPercent ?? 0);
+    setEditRtName(quote.rtName ?? '');
+    setEditRtQuery(quote.rtName ?? '');
     setEditing(true);
   };
 
-  const updateEditItem = (itemId: string, field: Partial<QuoteItem>) => {
-    if (!editData) return;
-    setEditData({
-      ...editData,
-      items: editData.items.map(item => {
+  const updateEditItem = (itemId: string, field: Partial<ItemLocal>) => {
+    setEditItems(prev =>
+      prev.map(item => {
         if (item.id !== itemId) return item;
-        const updated = { ...item, ...field };
+        const updated: ItemLocal = { ...item, ...field };
+        if (field.type && field.type !== 'personalizado') {
+          updated.description = QUOTE_ITEM_LABELS[field.type];
+        }
         updated.total = calcItemTotal(updated);
         return updated;
-      }),
-    });
+      })
+    );
+  };
+
+  const applyEditProduct = (itemId: string, product: Product) => {
+    setEditItems(prev =>
+      prev.map(item => {
+        if (item.id !== itemId) return item;
+        const updated: ItemLocal = {
+          ...item,
+          _catalogUnit: product.unit,
+          type: 'personalizado' as QuoteItemType,
+          description: product.name,
+          unitPrice: product.unitPrice,
+          ...(product.unit !== 'm²' ? { width: undefined, height: undefined } : {}),
+        };
+        updated.total = calcItemTotal(updated);
+        return updated;
+      })
+    );
   };
 
   const addEditItem = () => {
-    if (!editData) return;
-    setEditData({
-      ...editData,
-      items: [
-        ...editData.items,
-        {
-          id: crypto.randomUUID(),
-          type: 'vidro_comum' as QuoteItemType,
-          description: QUOTE_ITEM_LABELS['vidro_comum'],
-          quantity: 1,
-          unitPrice: 0,
-          total: 0,
-        },
-      ],
-    });
+    setEditItems(prev => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        type: 'vidro_comum' as QuoteItemType,
+        description: QUOTE_ITEM_LABELS['vidro_comum'],
+        quantity: 1,
+        unitPrice: 0,
+        total: 0,
+        _unit: editUnit,
+      },
+    ]);
   };
 
   const removeEditItem = (itemId: string) => {
-    if (!editData) return;
-    setEditData({ ...editData, items: editData.items.filter(i => i.id !== itemId) });
+    setEditItems(prev => prev.filter(i => i.id !== itemId));
   };
+
+  const editTotal = editItems.reduce((s, i) => s + i.total, 0);
 
   const saveEdit = async () => {
     if (!editData || !quote || !id) return;
@@ -202,13 +309,14 @@ const QuoteDetail = () => {
       toast.error("Preencha o nome do cliente.");
       return;
     }
-    if (editData.items.length === 0) {
+    if (editItems.length === 0) {
       toast.error("Adicione pelo menos um item.");
       return;
     }
     setSaving(true);
     try {
-      const items = editData.items.map(i => ({ ...i, total: calcItemTotal(i) }));
+      // Recalcula totais com a fórmula correta antes de salvar
+      const items = editItems.map(i => ({ ...i, total: calcItemTotal(i) }));
       const total = items.reduce((s, i) => s + i.total, 0);
       const updated: Quote = {
         ...quote,
@@ -218,10 +326,14 @@ const QuoteDetail = () => {
         notes: editData.notes.trim() || undefined,
         items,
         total,
+        commission: editCommission > 0 ? editCommission : undefined,
+        nfPercent: editNfRequired && editNfPercent > 0 ? editNfPercent : undefined,
+        rtName: editRtName.trim() || undefined,
       };
       await updateQuote(updated);
+      setQuote(updated);
       toast.success("Orçamento atualizado!");
-      navigate('/app/orcamentos');
+      setEditing(false);
     } catch {
       toast.error("Erro ao salvar orçamento.");
     } finally {
@@ -234,17 +346,13 @@ const QuoteDetail = () => {
   const date = new Date(quote.createdAt).toLocaleDateString("pt-BR");
   const co = quote.companyInfo;
 
-  const editTotal = editData
-    ? editData.items.reduce((s, i) => s + calcItemTotal(i), 0)
-    : 0;
-
   return (
     <div className="min-h-screen bg-muted">
       <AppHeader title="Orçamento" backTo="/app/orcamentos" />
 
       <div className="container py-6 max-w-2xl space-y-4">
 
-        {/* ===== KANBAN FLOW ===== */}
+        {/* ═══════════════ KANBAN FLOW ═══════════════ */}
         <div className="bg-card rounded-xl p-4 shadow-card space-y-3">
           <div className="flex items-center justify-between">
             <div className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
@@ -298,7 +406,7 @@ const QuoteDetail = () => {
           </div>
         </div>
 
-        {/* ===== ACTION BUTTONS ===== */}
+        {/* ═══════════════ ACTION BUTTONS ═══════════════ */}
         {!editing && (
           <div className="flex gap-2 flex-wrap">
             {currentStatus === 'orcado' && (
@@ -307,7 +415,6 @@ const QuoteDetail = () => {
                 Enviar para Cliente (WhatsApp)
               </Button>
             )}
-
             {(currentStatus === 'enviado' || currentStatus === 'aguardando') && (
               <>
                 <Button className="flex-1 gap-2 bg-success hover:bg-success/90 text-white" onClick={handleApprove}>
@@ -318,19 +425,16 @@ const QuoteDetail = () => {
                 </Button>
               </>
             )}
-
             {currentStatus === 'aprovado' && (
               <div className="flex-1 bg-success/10 text-success rounded-lg px-4 py-3 text-sm font-bold text-center">
                 ✅ Orçamento aprovado — Obra criada em Minhas Obras
               </div>
             )}
-
             {isPerdido && (
               <div className="flex-1 bg-destructive/10 text-destructive rounded-lg px-4 py-3 text-sm font-bold text-center">
                 ❌ Orçamento perdido
               </div>
             )}
-
             <Button variant="outline" className="gap-2" onClick={startEdit}>
               <Pencil className="h-4 w-4" /> Editar
             </Button>
@@ -340,160 +444,272 @@ const QuoteDetail = () => {
           </div>
         )}
 
-        {/* ===== EDIT FORM ===== */}
+        {/* ═══════════════ EDIT FORM (idêntico ao NewQuote) ═══════════════ */}
         {editing && editData && (
-          <div className="space-y-4">
+          <div className="space-y-6">
+
             {/* Dados do cliente */}
-            <div className="bg-card rounded-xl p-4 shadow-card space-y-3">
-              <h3 className="font-bold text-sm text-foreground">Dados do Cliente</h3>
+            <div>
+              <Label>Nome do Cliente</Label>
+              <Input className="mt-1" value={editData.clientName}
+                onChange={e => setEditData({ ...editData, clientName: e.target.value })}
+                placeholder="Ex: Maria da Silva" />
+            </div>
+            <div>
+              <Label>Telefone do Cliente (WhatsApp)</Label>
+              <Input className="mt-1" value={maskWhatsApp(editData.clientPhone)}
+                onChange={e => setEditData({ ...editData, clientPhone: maskWhatsApp(e.target.value) })}
+                placeholder="(00) 00000-0000" inputMode="tel" />
+            </div>
+            <div>
+              <Label>Tipo da Obra</Label>
+              <Select value={editData.jobType} onValueChange={v => setEditData({ ...editData, jobType: v })}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {JOB_TYPES.map(t => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Custos do Contrato (RT + NF) */}
+            <div className="bg-card rounded-xl p-4 shadow-card space-y-4">
+              <Label className="text-base font-bold">Custos do Contrato</Label>
+
               <div>
-                <Label className="text-xs">Nome do Cliente</Label>
-                <Input
-                  className="mt-1"
-                  value={editData.clientName}
-                  onChange={e => setEditData({ ...editData, clientName: e.target.value })}
-                  placeholder="Ex: Maria da Silva"
-                />
+                <Label className="text-xs">RT (Responsável Técnico) (%)</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <Input
+                    type="number" min={0} max={100} step="0.5"
+                    value={editCommission || ""}
+                    onChange={e => setEditCommission(parseFloat(e.target.value) || 0)}
+                    inputMode="decimal" placeholder="0" className="w-28"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {editCommission > 0 && editTotal > 0
+                      ? `= ${(editTotal * editCommission / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`
+                      : "sem RT"}
+                  </span>
+                </div>
+                <div className="relative mt-2">
+                  <Input
+                    placeholder="Ex: Escritório Silva Arquitetura"
+                    value={editRtName}
+                    onChange={e => {
+                      setEditRtName(e.target.value);
+                      setEditRtQuery(e.target.value);
+                      setShowEditRtSuggestions(true);
+                    }}
+                    onFocus={() => setShowEditRtSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowEditRtSuggestions(false), 150)}
+                    autoComplete="off"
+                  />
+                  {showEditRtSuggestions && editRtQuery.trim() && (() => {
+                    const filtered = rts.filter(r =>
+                      r.name.toLowerCase().includes(editRtQuery.toLowerCase())
+                    );
+                    if (!filtered.length) return null;
+                    return (
+                      <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-elevated py-1 max-h-48 overflow-y-auto">
+                        {filtered.map(r => (
+                          <button
+                            key={r.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+                            onMouseDown={() => {
+                              setEditRtName(r.name);
+                              setEditRtQuery(r.name);
+                              if (r.defaultPercentage > 0) setEditCommission(r.defaultPercentage);
+                              setShowEditRtSuggestions(false);
+                            }}
+                          >
+                            <span className="font-medium">{r.name}</span>
+                            {r.defaultPercentage > 0 && (
+                              <span className="text-xs text-muted-foreground ml-2">{r.defaultPercentage}% RT</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Nome do RT / Escritório (opcional)</p>
               </div>
+
               <div>
-                <Label className="text-xs">Telefone (WhatsApp)</Label>
-                <Input
-                  className="mt-1"
-                  value={maskWhatsApp(editData.clientPhone)}
-                  onChange={e => setEditData({ ...editData, clientPhone: maskWhatsApp(e.target.value) })}
-                  placeholder="(00) 00000-0000"
-                  inputMode="tel"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Tipo da Obra</Label>
-                <Select value={editData.jobType} onValueChange={v => setEditData({ ...editData, jobType: v })}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {JOB_TYPES.map(t => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-3 mb-2">
+                  <Label className="text-xs">NF necessária?</Label>
+                  <button
+                    type="button"
+                    onClick={() => setEditNfRequired(!editNfRequired)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${editNfRequired ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+                  >
+                    <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${editNfRequired ? 'translate-x-4' : 'translate-x-1'}`} />
+                  </button>
+                  <span className="text-xs text-muted-foreground">{editNfRequired ? "Sim" : "Não"}</span>
+                </div>
+                {editNfRequired && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number" min={0} max={100} step="0.5"
+                      value={editNfPercent || ""}
+                      onChange={e => setEditNfPercent(parseFloat(e.target.value) || 0)}
+                      inputMode="decimal" placeholder="0" className="w-28"
+                    />
+                    <span className="text-xs text-muted-foreground">% NF</span>
+                    {editNfPercent > 0 && editTotal > 0 && (
+                      <span className="text-sm text-muted-foreground">
+                        = {(editTotal * editNfPercent / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Itens */}
-            <div className="space-y-3">
-              <Label className="font-bold text-base">Itens do Orçamento</Label>
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-base font-bold">Itens do Orçamento</Label>
+              </div>
+
               <AnimatePresence>
-                {editData.items.map((item, idx) => (
+                {editItems.map((item, idx) => (
                   <motion.div
                     key={item.id}
-                    initial={{ opacity: 0, y: 8 }}
+                    initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: -40 }}
-                    className="bg-card rounded-xl p-4 shadow-card space-y-3"
+                    exit={{ opacity: 0, x: -50 }}
+                    className="bg-card rounded-xl p-4 shadow-card mb-3 space-y-3"
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-bold text-foreground">Item {idx + 1}</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive h-8 w-8"
+                      <Button type="button" variant="ghost" size="icon"
                         onClick={() => removeEditItem(item.id)}
-                      >
+                        className="text-destructive h-8 w-8">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
 
-                    {/* Tipo */}
-                    <Select
-                      value={item.type}
-                      onValueChange={(v: QuoteItemType) => updateEditItem(item.id, {
-                        type: v,
-                        description: v !== 'personalizado' ? QUOTE_ITEM_LABELS[v] : item.description,
-                      })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(QUOTE_ITEM_LABELS).map(([key, label]) => (
-                          <SelectItem key={key} value={key}>{label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {/* Busca no catálogo */}
+                    {catalogProducts.length > 0 && (
+                      <ProductSearch
+                        products={catalogProducts}
+                        onSelect={p => applyEditProduct(item.id, p)}
+                      />
+                    )}
 
-                    {/* Descrição */}
-                    <Input
-                      placeholder="Descrição do item..."
-                      value={item.description}
-                      onChange={e => updateEditItem(item.id, { description: e.target.value })}
-                    />
+                    {/* Tipo — só exibe se não vier do catálogo */}
+                    {!item._catalogUnit && (
+                      <Select
+                        value={item.type}
+                        onValueChange={(v: QuoteItemType) => updateEditItem(item.id, { type: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(QUOTE_ITEM_LABELS).map(([key, label]) => (
+                            <SelectItem key={key} value={key}>{label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
 
-                    {/* Local */}
+                    {/* Descrição: editável apenas para personalizado ou catálogo */}
+                    {(item.type === 'personalizado' || item._catalogUnit) && (
+                      <Input
+                        placeholder="Descreva o item..."
+                        value={item.description}
+                        onChange={e => updateEditItem(item.id, { description: e.target.value })}
+                      />
+                    )}
+
+                    {/* Local / Ambiente */}
                     <div>
                       <Label className="text-xs">Local / Ambiente</Label>
                       <Input
                         className="mt-1"
                         value={item.location || ''}
                         onChange={e => updateEditItem(item.id, { location: e.target.value })}
-                        placeholder="Ex: Porta da cozinha..."
+                        placeholder="Ex: Porta da cozinha, Janela da lavanderia..."
                       />
                     </div>
 
                     {/* Dimensões com toggle cm/mm */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-muted-foreground">Dimensões</span>
-                        <div className="flex rounded-md border border-border overflow-hidden text-xs">
-                          {(['mm', 'cm'] as const).map(u => (
-                            <button key={u} type="button" onClick={() => setEditUnit(u)}
-                              className={`px-2.5 py-0.5 font-medium transition-colors ${editUnit === u ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
-                              {u}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
+                    {(item._catalogUnit === 'm²' || !item._catalogUnit) && (() => {
+                      const unit = item._unit ?? editUnit;
+                      const toDisplay = (mm: number | undefined) =>
+                        mm !== undefined ? (unit === 'cm' ? mm / 10 : mm) : undefined;
+                      const toMm = (v: number) => unit === 'cm' ? v * 10 : v;
+                      return (
                         <div>
-                          <Label className="text-xs">Largura ({editUnit})</Label>
-                          <Input
-                            className="mt-1"
-                            type="number"
-                            min={0}
-                            step={editUnit === 'cm' ? '0.1' : '1'}
-                            value={item.width !== undefined ? (editUnit === 'cm' ? item.width / 10 : item.width) : ''}
-                            onChange={e => {
-                              const v = parseFloat(e.target.value);
-                              updateEditItem(item.id, { width: isNaN(v) ? undefined : (editUnit === 'cm' ? v * 10 : v) });
-                            }}
-                            inputMode="decimal"
-                            placeholder={editUnit === 'cm' ? '120' : '1200'}
-                          />
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-muted-foreground">Dimensões</span>
+                            <div className="flex rounded-md border border-border overflow-hidden text-xs">
+                              {(['mm', 'cm'] as const).map(u => (
+                                <button
+                                  key={u}
+                                  type="button"
+                                  onClick={() => updateEditItem(item.id, { _unit: u })}
+                                  className={`px-2.5 py-0.5 font-medium transition-colors ${
+                                    unit === u
+                                      ? 'bg-primary text-primary-foreground'
+                                      : 'text-muted-foreground hover:bg-muted'
+                                  }`}
+                                >
+                                  {u}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-xs">Largura ({unit})</Label>
+                              <Input
+                                className="mt-1"
+                                type="number"
+                                min={0}
+                                step={unit === 'cm' ? "0.1" : "1"}
+                                value={toDisplay(item.width) ?? ""}
+                                onChange={e => {
+                                  const v = parseFloat(e.target.value);
+                                  updateEditItem(item.id, { width: isNaN(v) ? undefined : toMm(v) });
+                                }}
+                                inputMode="decimal"
+                                placeholder={unit === 'cm' ? "120" : "1200"}
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Altura ({unit})</Label>
+                              <Input
+                                className="mt-1"
+                                type="number"
+                                min={0}
+                                step={unit === 'cm' ? "0.1" : "1"}
+                                value={toDisplay(item.height) ?? ""}
+                                onChange={e => {
+                                  const v = parseFloat(e.target.value);
+                                  updateEditItem(item.id, { height: isNaN(v) ? undefined : toMm(v) });
+                                }}
+                                inputMode="decimal"
+                                placeholder={unit === 'cm' ? "80" : "800"}
+                              />
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <Label className="text-xs">Altura ({editUnit})</Label>
-                          <Input
-                            className="mt-1"
-                            type="number"
-                            min={0}
-                            step={editUnit === 'cm' ? '0.1' : '1'}
-                            value={item.height !== undefined ? (editUnit === 'cm' ? item.height / 10 : item.height) : ''}
-                            onChange={e => {
-                              const v = parseFloat(e.target.value);
-                              updateEditItem(item.id, { height: isNaN(v) ? undefined : (editUnit === 'cm' ? v * 10 : v) });
-                            }}
-                            inputMode="decimal"
-                            placeholder={editUnit === 'cm' ? '80' : '800'}
-                          />
-                        </div>
-                      </div>
-                    </div>
+                      );
+                    })()}
 
                     {/* Quantidade e Preço */}
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label className="text-xs">Quantidade</Label>
+                        <Label className="text-xs">
+                          {item._catalogUnit === 'm²' ? 'Peças' : 'Quantidade'}
+                        </Label>
                         <Input
                           className="mt-1"
                           type="number"
@@ -505,32 +721,57 @@ const QuoteDetail = () => {
                       </div>
                       <div>
                         <Label className="text-xs">
-                          {item.width && item.height ? 'Preço / m² (R$)' : 'Valor Unitário (R$)'}
+                          {(item.width && item.height) ? 'Preço / m² (R$)' : item._catalogUnit ? `Preço / ${item._catalogUnit} (R$)` : 'Valor Unitário (R$)'}
                         </Label>
                         <Input
                           className="mt-1"
                           type="number"
                           min={0}
                           step="0.01"
-                          value={item.unitPrice || ''}
+                          value={item.unitPrice || ""}
                           onChange={e => updateEditItem(item.id, { unitPrice: parseFloat(e.target.value) || 0 })}
                           inputMode="decimal"
                         />
                       </div>
                     </div>
 
-                    {/* Info m² — width/height em mm → / 1_000_000 */}
-                    {item.width && item.height && (
-                      <div className="rounded-lg bg-primary/5 px-3 py-2 text-xs text-muted-foreground flex justify-between">
-                        <span>Metragem</span>
-                        <span className="font-medium text-foreground">
-                          {(item.width * item.height / 1_000_000 * item.quantity).toFixed(4)} m²
-                        </span>
-                      </div>
-                    )}
+                    {/* Metragem — aparece quando largura e altura estão preenchidas */}
+                    {item.width && item.height ? (() => {
+                      const areaPorPeca = item.width * item.height / 1_000_000;
+                      const areaTotal = areaPorPeca * item.quantity;
+                      return (
+                        <div className="rounded-lg bg-primary/5 px-3 py-2 space-y-0.5">
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Metragem</span>
+                            <span className="font-medium text-foreground">
+                              {areaTotal.toFixed(4)} m²
+                              {item.quantity > 1 && (
+                                <span className="text-muted-foreground font-normal">
+                                  {' '}({item.quantity} × {areaPorPeca.toFixed(4)} m²)
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                          {item._catalogUnit === 'm²' && (
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>Cálculo</span>
+                              <span>{areaTotal.toFixed(4)} m² × {fmt(item.unitPrice)}/m²</span>
+                            </div>
+                          )}
+                          {item._catalogUnit !== 'm²' && item.unitPrice > 0 && (
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>Valor/m²</span>
+                              <span className="font-medium text-foreground">
+                                {fmt(item.unitPrice / areaPorPeca)}/m²
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })() : null}
 
                     <div className="text-right text-sm font-bold text-primary">
-                      Subtotal: {fmt(calcItemTotal(item))}
+                      Subtotal: {fmt(item.total)}
                     </div>
                   </motion.div>
                 ))}
@@ -541,11 +782,43 @@ const QuoteDetail = () => {
               </Button>
             </div>
 
-            {/* Total resumo */}
-            <div className="bg-primary/10 rounded-xl p-4 flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Valor Total</span>
-              <span className="text-xl font-bold text-primary">{fmt(editTotal)}</span>
-            </div>
+            {/* Resumo total */}
+            {editItems.length > 0 && (
+              <div className="bg-primary/10 rounded-xl p-4 space-y-2">
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Total de m²</span>
+                  <span className="font-bold text-foreground">
+                    {editItems.reduce((s, i) => s + ((i.width || 0) * (i.height || 0) / 1_000_000 * i.quantity), 0).toFixed(4)} m²
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Valor Total</span>
+                  <span className="text-xl font-bold text-primary">{fmt(editTotal)}</span>
+                </div>
+                {(editCommission > 0 || (editNfRequired && editNfPercent > 0)) && editTotal > 0 && (
+                  <div className="border-t border-primary/20 pt-2 space-y-1">
+                    {editCommission > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Comissão ({editCommission}%)</span>
+                        <span className="font-semibold text-destructive">− {fmt(editTotal * editCommission / 100)}</span>
+                      </div>
+                    )}
+                    {editNfRequired && editNfPercent > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Nota Fiscal ({editNfPercent}%)</span>
+                        <span className="font-semibold text-destructive">− {fmt(editTotal * editNfPercent / 100)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm font-bold border-t border-primary/20 pt-1">
+                      <span className="text-muted-foreground">Lucro estimado</span>
+                      <span className="text-success">
+                        {fmt(editTotal - (editTotal * editCommission / 100) - (editNfRequired ? editTotal * editNfPercent / 100 : 0))}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Observações */}
             <div>
@@ -570,7 +843,7 @@ const QuoteDetail = () => {
           </div>
         )}
 
-        {/* ===== DOCUMENT VIEW ===== */}
+        {/* ═══════════════ DOCUMENT VIEW ═══════════════ */}
         {!editing && (
           <div ref={printRef} className="bg-white text-[hsl(215,25%,15%)] rounded-sm shadow-elevated" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
 
