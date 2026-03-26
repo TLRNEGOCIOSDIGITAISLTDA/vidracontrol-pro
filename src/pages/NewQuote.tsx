@@ -103,8 +103,9 @@ const ProductSearch = ({
 type ItemLocal = QuoteItem & { _catalogUnit?: string; _unit?: 'cm' | 'mm' };
 
 const calcItemTotal = (item: ItemLocal): number => {
-  if (item._catalogUnit === 'm²' && item.width && item.height) {
-    // width e height já em mm → m² = mm × mm / 1_000_000
+  if (item.width && item.height) {
+    // width e height em mm → m² = mm × mm / 1_000_000
+    // Aplica para QUALQUER item com dimensões, independente da unidade do catálogo
     const area = (item.width * item.height / 1_000_000) * item.quantity;
     return area * item.unitPrice;
   }
@@ -563,7 +564,7 @@ const NewQuote = () => {
                     </div>
                     <div>
                       <Label className="text-xs">
-                        {item._catalogUnit ? `Preço / ${item._catalogUnit} (R$)` : 'Valor Unitário (R$)'}
+                        {(item.width && item.height) ? 'Preço / m² (R$)' : item._catalogUnit ? `Preço / ${item._catalogUnit} (R$)` : 'Valor Unitário (R$)'}
                       </Label>
                       <Input
                         className="mt-1"
