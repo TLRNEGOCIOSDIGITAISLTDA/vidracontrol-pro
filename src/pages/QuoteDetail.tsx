@@ -31,9 +31,10 @@ function getFlowIndex(status: QuoteStatus): number {
 }
 
 // Calcula o total do item: usa m² se tiver dimensões, senão qtd × unitPrice
+// width e height são SEMPRE em mm no banco → divisor 1_000_000 para converter em m²
 function calcItemTotal(item: QuoteItem): number {
   if (item.width && item.height) {
-    return (item.width * item.height / 10_000) * item.quantity * item.unitPrice;
+    return (item.width * item.height / 1_000_000) * item.quantity * item.unitPrice;
   }
   return item.quantity * item.unitPrice;
 }
@@ -55,6 +56,7 @@ const QuoteDetail = () => {
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState<EditData | null>(null);
   const [saving, setSaving] = useState(false);
+  const [editUnit, setEditUnit] = useState<'cm' | 'mm'>('mm');
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -66,6 +68,9 @@ const QuoteDetail = () => {
         return;
       }
       setQuote(q);
+    });
+    getProfile().then(p => {
+      if (p?.defaultUnit) setEditUnit(p.defaultUnit);
     });
   }, [id, navigate]);
 
@@ -436,33 +441,52 @@ const QuoteDetail = () => {
                       />
                     </div>
 
-                    {/* Dimensões */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="text-xs">Largura (cm)</Label>
-                        <Input
-                          className="mt-1"
-                          type="number"
-                          min={0}
-                          step="0.1"
-                          value={item.width || ''}
-                          onChange={e => updateEditItem(item.id, { width: parseFloat(e.target.value) || undefined })}
-                          inputMode="decimal"
-                          placeholder="120"
-                        />
+                    {/* Dimensões com toggle cm/mm */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-muted-foreground">Dimensões</span>
+                        <div className="flex rounded-md border border-border overflow-hidden text-xs">
+                          {(['mm', 'cm'] as const).map(u => (
+                            <button key={u} type="button" onClick={() => setEditUnit(u)}
+                              className={`px-2.5 py-0.5 font-medium transition-colors ${editUnit === u ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
+                              {u}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                      <div>
-                        <Label className="text-xs">Altura (cm)</Label>
-                        <Input
-                          className="mt-1"
-                          type="number"
-                          min={0}
-                          step="0.1"
-                          value={item.height || ''}
-                          onChange={e => updateEditItem(item.id, { height: parseFloat(e.target.value) || undefined })}
-                          inputMode="decimal"
-                          placeholder="80"
-                        />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs">Largura ({editUnit})</Label>
+                          <Input
+                            className="mt-1"
+                            type="number"
+                            min={0}
+                            step={editUnit === 'cm' ? '0.1' : '1'}
+                            value={item.width !== undefined ? (editUnit === 'cm' ? item.width / 10 : item.width) : ''}
+                            onChange={e => {
+                              const v = parseFloat(e.target.value);
+                              updateEditItem(item.id, { width: isNaN(v) ? undefined : (editUnit === 'cm' ? v * 10 : v) });
+                            }}
+                            inputMode="decimal"
+                            placeholder={editUnit === 'cm' ? '120' : '1200'}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Altura ({editUnit})</Label>
+                          <Input
+                            className="mt-1"
+                            type="number"
+                            min={0}
+                            step={editUnit === 'cm' ? '0.1' : '1'}
+                            value={item.height !== undefined ? (editUnit === 'cm' ? item.height / 10 : item.height) : ''}
+                            onChange={e => {
+                              const v = parseFloat(e.target.value);
+                              updateEditItem(item.id, { height: isNaN(v) ? undefined : (editUnit === 'cm' ? v * 10 : v) });
+                            }}
+                            inputMode="decimal"
+                            placeholder={editUnit === 'cm' ? '80' : '800'}
+                          />
+                        </div>
                       </div>
                     </div>
 
@@ -495,12 +519,12 @@ const QuoteDetail = () => {
                       </div>
                     </div>
 
-                    {/* Info m² */}
+                    {/* Info m² — width/height em mm → / 1_000_000 */}
                     {item.width && item.height && (
                       <div className="rounded-lg bg-primary/5 px-3 py-2 text-xs text-muted-foreground flex justify-between">
                         <span>Metragem</span>
                         <span className="font-medium text-foreground">
-                          {(item.width * item.height / 10_000 * item.quantity).toFixed(4)} m²
+                          {(item.width * item.height / 1_000_000 * item.quantity).toFixed(4)} m²
                         </span>
                       </div>
                     )}
@@ -617,9 +641,9 @@ const QuoteDetail = () => {
                           <div className="font-bold">{item.description}</div>
                           {(item.width || item.height) && (
                             <div className="text-xs text-[hsl(215,10%,45%)]">
-                              {item.width ? `${item.width}cm` : '—'} × {item.height ? `${item.height}cm` : '—'}
+                              {item.width ? `${item.width}mm` : '—'} × {item.height ? `${item.height}mm` : '—'}
                               {item.width && item.height && (
-                                <span className="ml-1">({(item.width * item.height / 10_000).toFixed(4)}m²)</span>
+                                <span className="ml-1">({(item.width * item.height / 1_000_000).toFixed(4)}m²)</span>
                               )}
                             </div>
                           )}
