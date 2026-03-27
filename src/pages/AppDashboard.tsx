@@ -12,13 +12,14 @@ import { toast } from "sonner";
 import { QuoteKanban } from "@/components/app/QuoteKanban";
 import { supabase } from "@/integrations/supabase/client";
 
-const ALL_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'aprovado', 'perdido'];
-const ALL_JOB_STATUSES: JobStatus[] = ['a_iniciar', 'em_andamento', 'aguardando_pagamento', 'concluido'];
+const ALL_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'aprovado', 'entregue', 'perdido'];
+const ALL_JOB_STATUSES: JobStatus[] = ['a_iniciar', 'em_andamento', 'aguardando_pagamento', 'concluido', 'finalizado'];
 const JOB_STATUS_HEX: Record<JobStatus, string> = {
   a_iniciar: '#94a3b8',
   em_andamento: 'hsl(215,80%,55%)',
   aguardando_pagamento: '#f59e0b',
   concluido: '#22c55e',
+  finalizado: '#16a34a',
 };
 
 const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -191,6 +192,7 @@ const AppDashboard = () => {
   const monthlyData = useMemo(() => {
     const map = new Map<string, { key: string; month: string; sales: number; costs: number; count: number }>();
     const jobsByKey = new Map<string, typeof jobs>();
+    const quotesByKey = new Map<string, typeof quotes>();
     jobs.forEach(j => {
       const d = new Date(j.createdAt);
       const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
@@ -203,6 +205,12 @@ const AppDashboard = () => {
       if (!jobsByKey.has(key)) jobsByKey.set(key, []);
       jobsByKey.get(key)!.push(j);
     });
+    quotes.forEach(q => {
+      const d = new Date(q.createdAt);
+      const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
+      if (!quotesByKey.has(key)) quotesByKey.set(key, []);
+      quotesByKey.get(key)!.push(q);
+    });
     return Array.from(map.values())
       .sort((a, b) => b.key.localeCompare(a.key))
       .map(e => {
@@ -214,9 +222,10 @@ const AppDashboard = () => {
           received,
           pending: Math.max(0, e.sales - received),
           monthJobs: jobsByKey.get(e.key) || [],
+          monthQuotes: quotesByKey.get(e.key) || [],
         };
       });
-  }, [jobs, paymentsByMonth]);
+  }, [jobs, quotes, paymentsByMonth]);
 
   const renderLabel = ({ percent }: { percent: number }) =>
     percent > 0 ? `${(percent * 100).toFixed(0)}%` : "";
@@ -414,7 +423,7 @@ const AppDashboard = () => {
                               </div>
                             </div>
 
-                            {/* Accordion de obras do mês */}
+                            {/* Accordion de orçamentos do mês por status */}
                             <AnimatePresence>
                               {expandedMonth === m.key && (
                                 <motion.div
@@ -424,28 +433,45 @@ const AppDashboard = () => {
                                   transition={{ duration: 0.2 }}
                                   className="overflow-hidden"
                                 >
-                                  <div className="mt-3 pt-3 border-t border-border/50 space-y-1">
-                                    {m.monthJobs.map(j => {
-                                      const jStatus = (j.status as JobStatus) || 'em_andamento';
-                                      return (
-                                        <Link key={j.id} to={`/app/obra/${j.id}`}>
-                                          <div className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 hover:bg-muted/60 active:bg-muted transition-colors min-h-[44px]">
-                                            <div className="flex-1 min-w-0">
-                                              <div className="text-sm font-medium text-foreground truncate">{j.clientName}</div>
-                                              {j.description && (
-                                                <div className="text-xs text-muted-foreground truncate">{j.description}</div>
-                                              )}
+                                  <div className="mt-3 pt-3 border-t border-border/50 space-y-3">
+                                    {m.monthQuotes.length === 0 ? (
+                                      <p className="text-xs text-muted-foreground text-center py-2">Nenhum orçamento neste mês</p>
+                                    ) : (
+                                      (['orcado', 'enviado', 'aprovado', 'entregue', 'perdido'] as QuoteStatus[]).map(st => {
+                                        const group = m.monthQuotes.filter(q => (q.status || 'orcado') === st);
+                                        if (group.length === 0) return null;
+                                        const emoji = st === 'orcado' ? '🟡' : st === 'enviado' ? '📤' : st === 'aprovado' ? '✅' : st === 'entregue' ? '📦' : '❌';
+                                        return (
+                                          <div key={st}>
+                                            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
+                                              <span>{emoji}</span>
+                                              <span>{QUOTE_STATUS_LABELS[st]}</span>
+                                              <span className="ml-1 font-normal">({group.length})</span>
                                             </div>
-                                            <div className="flex items-center gap-2 shrink-0">
-                                              <span className="text-sm font-bold text-foreground">{fmt(j.saleValue)}</span>
-                                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${JOB_STATUS_COLORS[jStatus]}`}>
-                                                {JOB_STATUS_LABELS[jStatus]}
-                                              </span>
+                                            <div className="space-y-0.5">
+                                              {group.map(q => (
+                                                <Link key={q.id} to={`/app/orcamento/${q.id}`}>
+                                                  <div className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 hover:bg-muted/60 active:bg-muted transition-colors min-h-[40px]">
+                                                    <div className="flex-1 min-w-0">
+                                                      <div className="text-sm font-medium text-foreground truncate">{q.clientName}</div>
+                                                      {q.jobType && (
+                                                        <div className="text-xs text-muted-foreground truncate">{q.jobType}</div>
+                                                      )}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                      <span className="text-sm font-bold text-foreground">{fmt(q.total)}</span>
+                                                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${QUOTE_STATUS_BG[st]}`}>
+                                                        {QUOTE_STATUS_LABELS[st]}
+                                                      </span>
+                                                    </div>
+                                                  </div>
+                                                </Link>
+                                              ))}
                                             </div>
                                           </div>
-                                        </Link>
-                                      );
-                                    })}
+                                        );
+                                      })
+                                    )}
                                   </div>
                                 </motion.div>
                               )}

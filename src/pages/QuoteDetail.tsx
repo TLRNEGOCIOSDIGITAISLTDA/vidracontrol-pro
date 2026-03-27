@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
-import { Trash2, Send, CheckCircle2, XCircle, Loader2, Circle, Pencil, Plus } from "lucide-react";
+import { Trash2, Send, CheckCircle2, XCircle, Loader2, Circle, Pencil, Plus, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,7 @@ const FLOW_STEPS: { status: QuoteStatus; label: string }[] = [
   { status: 'orcado', label: 'Orçado' },
   { status: 'enviado', label: 'Enviado' },
   { status: 'aprovado', label: 'Aprovado' },
+  { status: 'entregue', label: 'Entregue' },
 ];
 
 function getFlowIndex(status: QuoteStatus): number {
@@ -142,6 +143,13 @@ const QuoteDetail = () => {
     await changeQuoteStatus(id, 'perdido');
     setQuote({ ...quote, status: 'perdido' });
     toast("Orçamento marcado como Perdido.");
+  };
+
+  const handleEntregue = async () => {
+    if (!quote || !id) return;
+    await changeQuoteStatus(id, 'entregue');
+    setQuote({ ...quote, status: 'entregue' });
+    toast.success("Vidro entregue ao cliente!");
   };
 
   // ═══════════════════════════════════════════════════════════
@@ -347,8 +355,18 @@ const QuoteDetail = () => {
               </>
             )}
             {currentStatus === 'aprovado' && (
-              <div className="flex-1 bg-success/10 text-success rounded-lg px-4 py-3 text-sm font-bold text-center">
-                ✅ Orçamento aprovado — Obra criada em Minhas Obras
+              <>
+                <div className="flex-1 bg-success/10 text-success rounded-lg px-4 py-3 text-sm font-bold text-center">
+                  ✅ Orçamento aprovado — Obra criada em Minhas Obras
+                </div>
+                <Button className="gap-2 bg-[hsl(195,75%,45%)] hover:bg-[hsl(195,75%,38%)] text-white" onClick={handleEntregue}>
+                  <Package className="h-4 w-4" /> Entregue
+                </Button>
+              </>
+            )}
+            {currentStatus === 'entregue' && (
+              <div className="flex-1 bg-[hsl(195,75%,45%)]/10 text-[hsl(195,75%,35%)] rounded-lg px-4 py-3 text-sm font-bold text-center">
+                📦 Vidro entregue ao cliente
               </div>
             )}
             {isPerdido && (

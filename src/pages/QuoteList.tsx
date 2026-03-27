@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { QuoteKanban } from "@/components/app/QuoteKanban";
 import { QuoteSendMenu } from "@/components/app/QuoteSendMenu";
 
-const ALL_STATUSES: QuoteStatus[] = ["orcado", "enviado", "aguardando", "aprovado", "perdido"];
+const ALL_STATUSES: QuoteStatus[] = ["orcado", "enviado", "aguardando", "aprovado", "entregue", "perdido"];
 
 // ===== MAIN =====
 const QuoteList = () => {

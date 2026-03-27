@@ -47,7 +47,7 @@ function parseDate(raw: string | null): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-const ALL_JOB_STATUSES: JobStatus[] = ['a_iniciar', 'em_andamento', 'aguardando_pagamento', 'concluido'];
+const ALL_JOB_STATUSES: JobStatus[] = ['a_iniciar', 'em_andamento', 'aguardando_pagamento', 'concluido', 'finalizado'];
 
 const JobDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -241,8 +241,15 @@ const JobDetail = () => {
     });
     resetPayForm();
     setPayDialogOpen(false);
+    const currentTotal = payments.reduce((s, p) => s + p.amount, 0);
+    const newTotal = currentTotal + val;
+    if (job.saleValue > 0 && newTotal >= job.saleValue && job.status !== 'finalizado') {
+      await updateJob(job.id, { status: 'finalizado' });
+      toast.success("Recebimento registrado! Obra finalizada 🎉");
+    } else {
+      toast.success("Recebimento registrado!");
+    }
     await reload();
-    toast.success("Recebimento registrado!");
   };
 
   const handleDeletePayment = async (paymentId: string) => {
@@ -270,8 +277,16 @@ const JobDetail = () => {
       notes: editPayNotes.trim() || undefined,
     });
     setEditPayDialogOpen(false);
+    const oldAmount = payments.find(p => p.id === editPayId)?.amount || 0;
+    const currentTotal = payments.reduce((s, p) => s + p.amount, 0);
+    const newTotal = currentTotal - oldAmount + val;
+    if (job.saleValue > 0 && newTotal >= job.saleValue && job.status !== 'finalizado') {
+      await updateJob(job.id, { status: 'finalizado' });
+      toast.success("Recebimento atualizado! Obra finalizada 🎉");
+    } else {
+      toast.success("Recebimento atualizado!");
+    }
     await reload();
-    toast.success("Recebimento atualizado!");
   };
 
   // ===== Job actions =====

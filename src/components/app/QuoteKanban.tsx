@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, XCircle, Eye } from "lucide-react";
+import { CheckCircle2, XCircle, Eye, Package } from "lucide-react";
 import { useData } from "@/lib/DataContext";
 import { Quote, QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from "@/lib/types";
 import { toast } from "sonner";
@@ -17,7 +17,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 
-const KANBAN_STATUSES: QuoteStatus[] = ["orcado", "enviado", "aprovado", "perdido"];
+const KANBAN_STATUSES: QuoteStatus[] = ["orcado", "enviado", "aprovado", "entregue", "perdido"];
 
 function triggerWhatsAppSimples(quote: Quote) {
   const phone = quote.clientPhone?.replace(/\D/g, "");
@@ -51,7 +51,8 @@ function KanbanCard({
 
   const showWA = status === "orcado";
   const showAprovar = status === "enviado" || status === "aguardando";
-  const showPerdido = status === "enviado" || status === "aguardando";
+  const showEntregue = status === "aprovado";
+  const showPerdido = status === "enviado" || status === "aguardando" || status === "aprovado";
 
   return (
     <div
@@ -101,6 +102,18 @@ function KanbanCard({
             className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md bg-success/10 text-success hover:bg-success/20 transition-colors"
           >
             <CheckCircle2 className="h-2.5 w-2.5" /> Aprovar
+          </button>
+        )}
+        {showEntregue && (
+          <button
+            onClick={async (e) => {
+              e.preventDefault();
+              await onStatusChange(quote.id, "entregue");
+              toast.success("Marcado como Entregue!");
+            }}
+            className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md bg-[hsl(195,75%,45%)]/10 text-[hsl(195,75%,35%)] hover:bg-[hsl(195,75%,45%)]/20 transition-colors"
+          >
+            <Package className="h-2.5 w-2.5" /> Entregue
           </button>
         )}
         {showPerdido && (
@@ -218,6 +231,8 @@ export function QuoteKanban({ novoId }: { novoId?: string | null }) {
       toast.success("Status: Enviado. WhatsApp aberto!");
     } else if (newStatus === "aprovado") {
       toast.success("Obra criada com sucesso!");
+    } else if (newStatus === "entregue") {
+      toast.success("Marcado como Entregue!");
     } else if (newStatus === "perdido") {
       toast("Marcado como Perdido.");
     } else {
