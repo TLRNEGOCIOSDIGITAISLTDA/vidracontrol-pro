@@ -413,6 +413,20 @@ export async function addJobPayment(
   };
 }
 
+export async function updateJobPayment(
+  paymentId: string,
+  fields: { amount?: number; paymentDate?: string; paymentMethod?: PaymentMethod; notes?: string }
+): Promise<void> {
+  const uid = await getUserId();                          // [SEC] valida dono
+  const update: Record<string, unknown> = {};
+  if (fields.amount !== undefined) update.amount = fields.amount;
+  if (fields.paymentDate !== undefined) update.payment_date = fields.paymentDate;
+  if (fields.paymentMethod !== undefined) update.payment_method = fields.paymentMethod;
+  if (fields.notes !== undefined) update.notes = fields.notes || null;
+  await supabase.from('job_payments' as any).update(update).eq('id', paymentId).eq('user_id', uid);
+  await logAudit('update', 'job_payment', paymentId);
+}
+
 export async function deleteJobPayment(paymentId: string): Promise<void> {
   const uid = await getUserId();                          // [SEC] valida dono
   await supabase.from('job_payments' as any).delete().eq('id', paymentId).eq('user_id', uid);

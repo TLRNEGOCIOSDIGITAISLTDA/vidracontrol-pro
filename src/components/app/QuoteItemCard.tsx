@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Trash2, X, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QuoteItem, QuoteItemType, QUOTE_ITEM_LABELS, Product } from "@/lib/types";
 import { motion } from "framer-motion";
+import { CurrencyInput, numericToDisplay, parseCurrency } from "@/components/app/CurrencyInput";
 
 // ── Tipos exportados ────────────────────────────────────────────────────────
 // width/height são SEMPRE em mm internamente; _catalogUnit e _unit NÃO são salvos no banco
@@ -126,6 +127,23 @@ export const QuoteItemCard = ({
 }: QuoteItemCardProps) => {
   const fmt = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  // Display state para o campo de preço (máscara pt-BR)
+  const [priceDisplay, setPriceDisplay] = useState(() => numericToDisplay(item.unitPrice));
+
+  // Sincroniza quando o unitPrice muda externamente (ex: produto do catálogo aplicado)
+  const prevPriceRef = useRef(item.unitPrice);
+  useEffect(() => {
+    if (item.unitPrice !== prevPriceRef.current) {
+      prevPriceRef.current = item.unitPrice;
+      setPriceDisplay(numericToDisplay(item.unitPrice));
+    }
+  }, [item.unitPrice]);
+
+  const handlePriceChange = useCallback((display: string, numeric: number) => {
+    setPriceDisplay(display);
+    onUpdate(item.id, { unitPrice: numeric });
+  }, [item.id, onUpdate]);
 
   const unit = item._unit ?? defaultUnit;
   const toDisplay = (mm: number | undefined) =>
@@ -286,16 +304,10 @@ export const QuoteItemCard = ({
               ? `Preço / ${item._catalogUnit} (R$)`
               : 'Valor Unitário (R$)'}
           </Label>
-          <Input
+          <CurrencyInput
             className="mt-1"
-            type="number"
-            min={0}
-            step="0.01"
-            value={item.unitPrice || ""}
-            onChange={e =>
-              onUpdate(item.id, { unitPrice: parseFloat(e.target.value) || 0 })
-            }
-            inputMode="decimal"
+            value={priceDisplay}
+            onChange={handlePriceChange}
           />
         </div>
       </div>

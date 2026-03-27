@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AppHeader from "@/components/app/AppHeader";
+import { CurrencyInput, parseCurrency } from "@/components/app/CurrencyInput";
 import { addJob } from "@/lib/storage";
 import { useData } from "@/lib/DataContext";
 import { QuoteItemType, QUOTE_ITEM_LABELS, JobItem } from "@/lib/types";
@@ -40,7 +41,7 @@ const NewJob = () => {
 
   const handleAddItem = () => {
     const qty = parseInt(itemQty) || 0;
-    const price = parseNum(itemPrice);
+    const price = parseCurrency(itemPrice);
     if (qty <= 0 || price <= 0) {
       toast.error("Informe quantidade e valor unitário válidos.");
       return;
@@ -165,7 +166,7 @@ const NewJob = () => {
                 </div>
                 <div>
                   <Label className="text-xs">Valor Unitário (R$)</Label>
-                  <Input placeholder="Ex: 450" value={itemPrice} onChange={e => setItemPrice(e.target.value)} className="mt-1" inputMode="decimal" />
+                  <CurrencyInput className="mt-1" value={itemPrice} onChange={(display) => setItemPrice(display)} />
                 </div>
               </div>
 

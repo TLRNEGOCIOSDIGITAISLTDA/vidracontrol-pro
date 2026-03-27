@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Plus, Trash2, Camera, PieChart, CheckCircle, Upload, Loader2, Wallet } from "lucide-react";
+import { Plus, Trash2, Camera, PieChart, CheckCircle, Upload, Loader2, Wallet, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import AppHeader from "@/components/app/AppHeader";
-import { getJob, addExpense, deleteExpense, updateJob, getJobPayments, addJobPayment, deleteJobPayment } from "@/lib/storage";
+import { getJob, addExpense, deleteExpense, updateJob, getJobPayments, addJobPayment, deleteJobPayment, updateJobPayment } from "@/lib/storage";
+import { CurrencyInput, parseCurrency, numericToDisplay } from "@/components/app/CurrencyInput";
 import { useData } from "@/lib/DataContext";
 import { Job, JobPayment, PaymentMethod, PAYMENT_METHODS, JobStatus, JOB_STATUS_LABELS, JOB_STATUS_COLORS, ExpenseCategory, CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/types";
 import { toast } from "sonner";
@@ -64,12 +65,20 @@ const JobDetail = () => {
   const [expCategory, setExpCategory] = useState<ExpenseCategory>("material");
   const [expDate, setExpDate] = useState(() => new Date().toISOString().slice(0, 10));
 
-  // Payment dialog
+  // Payment dialog (adicionar)
   const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [payAmount, setPayAmount] = useState("");
   const [payDate, setPayDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [payMethod, setPayMethod] = useState<PaymentMethod>("Pix");
   const [payNotes, setPayNotes] = useState("");
+
+  // Payment dialog (editar)
+  const [editPayDialogOpen, setEditPayDialogOpen] = useState(false);
+  const [editPayId, setEditPayId] = useState("");
+  const [editPayAmount, setEditPayAmount] = useState("");
+  const [editPayDate, setEditPayDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [editPayMethod, setEditPayMethod] = useState<PaymentMethod>("Pix");
+  const [editPayNotes, setEditPayNotes] = useState("");
 
   // AI scan state
   const [scanning, setScanning] = useState(false);
@@ -124,8 +133,8 @@ const JobDetail = () => {
 
   const handleAddExpense = async () => {
     if (!expDesc.trim()) { toast.error("Preencha a descrição."); return; }
-    const val = parseFloat(expValue.replace(/[^\d.,]/g, "").replace(",", "."));
-    if (isNaN(val) || val <= 0) { toast.error("Informe um valor válido."); return; }
+    const val = parseCurrency(expValue);
+    if (!val || val <= 0) { toast.error("Informe um valor válido."); return; }
     await addExpense(job.id, { description: expDesc.trim(), value: val, category: expCategory });
     resetExpForm();
     setDialogOpen(false);
@@ -166,7 +175,7 @@ const JobDetail = () => {
         const d = data.data;
         if (d.descricao) setExpDesc(d.descricao);
         setExpCategory(mapExpenseCategory(d.categoria));
-        if (d.valor_total) setExpValue(String(d.valor_total).replace('.', ','));
+        if (d.valor_total) setExpValue(numericToDisplay(d.valor_total));
         setExpDate(parseDate(d.data));
         setAiConfirm(true);
         toast.success("Nota fiscal lida com sucesso!");
@@ -190,8 +199,8 @@ const JobDetail = () => {
   };
 
   const handleAddPayment = async () => {
-    const val = parseFloat(payAmount.replace(/[^\d.,]/g, "").replace(",", "."));
-    if (isNaN(val) || val <= 0) { toast.error("Informe um valor válido."); return; }
+    const val = parseCurrency(payAmount);
+    if (!val || val <= 0) { toast.error("Informe um valor válido."); return; }
     await addJobPayment(job.id, {
       amount: val,
       paymentDate: payDate,
@@ -208,6 +217,29 @@ const JobDetail = () => {
     await deleteJobPayment(paymentId);
     await reload();
     toast.success("Recebimento removido.");
+  };
+
+  const openEditPayment = (pay: JobPayment) => {
+    setEditPayId(pay.id);
+    setEditPayAmount(numericToDisplay(pay.amount));
+    setEditPayDate(pay.paymentDate);
+    setEditPayMethod(pay.paymentMethod);
+    setEditPayNotes(pay.notes || "");
+    setEditPayDialogOpen(true);
+  };
+
+  const handleEditPayment = async () => {
+    const val = parseCurrency(editPayAmount);
+    if (!val || val <= 0) { toast.error("Informe um valor válido."); return; }
+    await updateJobPayment(editPayId, {
+      amount: val,
+      paymentDate: editPayDate,
+      paymentMethod: editPayMethod,
+      notes: editPayNotes.trim() || undefined,
+    });
+    setEditPayDialogOpen(false);
+    await reload();
+    toast.success("Recebimento atualizado!");
   };
 
   // ===== Job actions =====
@@ -469,9 +501,14 @@ const JobDetail = () => {
                       </p>
                       {pay.notes && <p className="text-xs text-muted-foreground mt-0.5 truncate">{pay.notes}</p>}
                     </div>
-                    <button onClick={() => handleDeletePayment(pay.id)} className="text-muted-foreground hover:text-destructive transition-colors shrink-0 mt-0.5">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                      <button onClick={() => openEditPayment(pay)} className="text-muted-foreground hover:text-primary transition-colors p-1">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={() => handleDeletePayment(pay.id)} className="text-muted-foreground hover:text-destructive transition-colors p-1">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </motion.div>
                 ))}
               </div>
@@ -544,7 +581,7 @@ const JobDetail = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Valor (R$)</Label>
-                    <Input className="mt-1" placeholder="0,00" inputMode="decimal" value={expValue} onChange={e => setExpValue(e.target.value)} />
+                    <CurrencyInput className="mt-1" value={expValue} onChange={(display) => setExpValue(display)} />
                   </div>
                   <div>
                     <Label>Data</Label>
@@ -576,6 +613,53 @@ const JobDetail = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Payment Dialog */}
+      <Dialog open={editPayDialogOpen} onOpenChange={setEditPayDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Recebimento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label>Valor Recebido (R$)</Label>
+              <CurrencyInput
+                className="mt-1"
+                value={editPayAmount}
+                onChange={(display) => setEditPayAmount(display)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Data</Label>
+                <Input className="mt-1" type="date" value={editPayDate} onChange={e => setEditPayDate(e.target.value)} />
+              </div>
+              <div>
+                <Label>Forma de Pagamento</Label>
+                <Select value={editPayMethod} onValueChange={(v) => setEditPayMethod(v as PaymentMethod)}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHODS.map(m => (
+                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Observação (opcional)</Label>
+              <Textarea
+                className="mt-1"
+                rows={2}
+                placeholder='Ex: "Entrada 50%", "Parcela final"...'
+                value={editPayNotes}
+                onChange={e => setEditPayNotes(e.target.value)}
+              />
+            </div>
+            <Button onClick={handleEditPayment} className="w-full">Salvar Alterações</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Add Payment Dialog */}
       <Dialog open={payDialogOpen} onOpenChange={(open) => { setPayDialogOpen(open); if (!open) resetPayForm(); }}>
         <DialogContent className="sm:max-w-md">
@@ -585,12 +669,10 @@ const JobDetail = () => {
           <div className="space-y-4 pt-2">
             <div>
               <Label>Valor Recebido (R$)</Label>
-              <Input
+              <CurrencyInput
                 className="mt-1"
-                placeholder="0,00"
-                inputMode="decimal"
                 value={payAmount}
-                onChange={e => setPayAmount(e.target.value)}
+                onChange={(display) => setPayAmount(display)}
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
