@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import AppHeader from "@/components/app/AppHeader";
-import { getJob, addExpense, deleteExpense, updateJob, getJobPayments, addJobPayment, deleteJobPayment, updateJobPayment } from "@/lib/storage";
+import { getJob, addExpense, deleteExpense, updateExpense, updateJob, getJobPayments, addJobPayment, deleteJobPayment, updateJobPayment } from "@/lib/storage";
 import { CurrencyInput, parseCurrency, numericToDisplay } from "@/components/app/CurrencyInput";
 import { useData } from "@/lib/DataContext";
 import { Job, JobPayment, PaymentMethod, PAYMENT_METHODS, JobStatus, JOB_STATUS_LABELS, JOB_STATUS_COLORS, ExpenseCategory, CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/types";
@@ -71,6 +71,14 @@ const JobDetail = () => {
   const [payDate, setPayDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [payMethod, setPayMethod] = useState<PaymentMethod>("Pix");
   const [payNotes, setPayNotes] = useState("");
+
+  // Expense dialog (editar)
+  const [editExpDialogOpen, setEditExpDialogOpen] = useState(false);
+  const [editExpId, setEditExpId] = useState("");
+  const [editExpDesc, setEditExpDesc] = useState("");
+  const [editExpValue, setEditExpValue] = useState("");
+  const [editExpCategory, setEditExpCategory] = useState<ExpenseCategory>("material");
+  const [editExpDate, setEditExpDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   // Payment dialog (editar)
   const [editPayDialogOpen, setEditPayDialogOpen] = useState(false);
@@ -146,6 +154,30 @@ const JobDetail = () => {
     await deleteExpense(job.id, expenseId);
     await reload();
     toast.success("Gasto removido.");
+  };
+
+  const openEditExpense = (exp: { id: string; description: string; value: number; category: ExpenseCategory; date?: string }) => {
+    setEditExpId(exp.id);
+    setEditExpDesc(exp.description);
+    setEditExpValue(numericToDisplay(exp.value));
+    setEditExpCategory(exp.category);
+    setEditExpDate(exp.date || new Date().toISOString().slice(0, 10));
+    setEditExpDialogOpen(true);
+  };
+
+  const handleEditExpense = async () => {
+    if (!editExpDesc.trim()) { toast.error("Preencha a descrição."); return; }
+    const val = parseCurrency(editExpValue);
+    if (!val || val <= 0) { toast.error("Informe um valor válido."); return; }
+    await updateExpense(editExpId, {
+      description: editExpDesc.trim(),
+      value: val,
+      category: editExpCategory,
+      date: editExpDate,
+    });
+    setEditExpDialogOpen(false);
+    await reload();
+    toast.success("Gasto atualizado!");
   };
 
   const handleFileSelected = async (file: File) => {
@@ -418,10 +450,13 @@ const JobDetail = () => {
                         <p className="text-sm font-medium text-foreground truncate">{exp.description}</p>
                         <span className="text-xs text-muted-foreground">{CATEGORY_LABELS[exp.category] ?? exp.category}</span>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1 shrink-0">
                         <span className="text-sm font-bold text-foreground">{fmt(exp.value)}</span>
-                        <button onClick={() => handleDeleteExpense(exp.id)} className="text-muted-foreground hover:text-destructive transition-colors">
-                          <Trash2 className="h-4 w-4" />
+                        <button onClick={() => openEditExpense(exp)} className="text-muted-foreground hover:text-primary transition-colors p-1">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={() => handleDeleteExpense(exp.id)} className="text-muted-foreground hover:text-destructive transition-colors p-1">
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </motion.div>
@@ -609,6 +644,43 @@ const JobDetail = () => {
                 )}
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Expense Dialog */}
+      <Dialog open={editExpDialogOpen} onOpenChange={setEditExpDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Gasto</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div>
+              <Label>Descrição</Label>
+              <Input className="mt-1" placeholder="Ex: Silicone, mão de obra, frete..." value={editExpDesc} onChange={e => setEditExpDesc(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Valor (R$)</Label>
+                <CurrencyInput className="mt-1" value={editExpValue} onChange={(display) => setEditExpValue(display)} />
+              </div>
+              <div>
+                <Label>Data</Label>
+                <Input className="mt-1" type="date" value={editExpDate} onChange={e => setEditExpDate(e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <Label>Categoria</Label>
+              <Select value={editExpCategory} onValueChange={(v) => setEditExpCategory(v as ExpenseCategory)}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleEditExpense} className="w-full">Salvar Alterações</Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -433,6 +433,20 @@ export async function deleteJobPayment(paymentId: string): Promise<void> {
   await logAudit('delete', 'job_payment', paymentId);
 }
 
+export async function updateExpense(
+  expenseId: string,
+  fields: { description?: string; value?: number; category?: import('./types').ExpenseCategory; date?: string }
+): Promise<void> {
+  const uid = await getUserId();                          // [SEC] valida dono
+  const update: Record<string, unknown> = {};
+  if (fields.description !== undefined) update.description = fields.description;
+  if (fields.value !== undefined) update.value = fields.value;
+  if (fields.category !== undefined) update.category = fields.category;
+  if (fields.date !== undefined) update.date = fields.date;
+  await supabase.from('job_expenses').update(update).eq('id', expenseId).eq('user_id', uid);
+  await logAudit('update', 'expense', expenseId);
+}
+
 export async function deleteExpense(jobId: string, expenseId: string) {
   const uid = await getUserId();                          // [SEC] valida dono
   await supabase.from('job_expenses').delete().eq('id', expenseId).eq('user_id', uid);
