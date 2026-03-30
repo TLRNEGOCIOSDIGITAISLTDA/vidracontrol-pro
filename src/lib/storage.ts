@@ -232,9 +232,10 @@ export async function getJobs(): Promise<Job[]> {
 
   const jobIds = rows.map(r => r.id);
 
-  const [{ data: items }, { data: expenses }] = await Promise.all([
+  const [{ data: items }, { data: expenses }, { data: payments }] = await Promise.all([
     supabase.from('job_items').select('*').in('job_id', jobIds.length ? jobIds : ['']),
     supabase.from('job_expenses').select('*').in('job_id', jobIds.length ? jobIds : ['']),
+    supabase.from('job_payments').select('job_id, amount').in('job_id', jobIds.length ? jobIds : ['']),
   ]);
 
   return rows.map(r => ({
@@ -244,6 +245,7 @@ export async function getJobs(): Promise<Job[]> {
     saleValue: Number(r.sale_value),
     status: r.status as any,
     createdAt: r.created_at,
+    totalReceived: (payments || []).filter(p => p.job_id === r.id).reduce((s: number, p: any) => s + Number(p.amount), 0),
     items: (items || []).filter(i => i.job_id === r.id).map(i => ({
       id: i.id,
       type: i.type as any,

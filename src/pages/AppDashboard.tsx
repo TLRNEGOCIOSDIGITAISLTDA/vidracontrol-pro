@@ -734,14 +734,30 @@ const AppDashboard = () => {
                                   {colJobs.map((job) => {
                                     const expenses = job.expenses.reduce((s, e) => s + e.value, 0);
                                     const profit = job.saleValue - expenses;
+                                    const received = job.totalReceived ?? 0;
+                                    const pending = Math.max(0, job.saleValue - received);
                                     return (
                                       <Link key={job.id} to={`/app/obra/${job.id}`}>
                                         <div className="bg-card rounded-xl border border-border/50 shadow-card hover:shadow-elevated transition-shadow p-3 mb-2">
-                                          <h3 className="font-bold text-foreground text-sm leading-tight truncate mb-1">{job.clientName}</h3>
-                                          {job.description && <p className="text-xs text-muted-foreground truncate mb-1">{job.description}</p>}
-                                          <div className="flex items-center justify-between">
-                                            <span className="text-[10px] text-muted-foreground">Lucro:</span>
-                                            <span className={`text-xs font-bold ${profit >= 0 ? "text-success" : "text-destructive"}`}>{fmt(profit)}</span>
+                                          <h3 className="font-bold text-foreground text-sm leading-tight truncate">{job.clientName}</h3>
+                                          {job.description && <p className="text-[11px] text-muted-foreground truncate mb-2">{job.description}</p>}
+                                          <div className="grid grid-cols-2 gap-x-2 gap-y-1 mt-1.5">
+                                            <div>
+                                              <div className="text-[9px] text-muted-foreground leading-tight">Total</div>
+                                              <div className="text-[11px] font-bold text-foreground leading-tight">{fmt(job.saleValue)}</div>
+                                            </div>
+                                            <div>
+                                              <div className="text-[9px] text-muted-foreground leading-tight">Recebido</div>
+                                              <div className="text-[11px] font-bold text-success leading-tight">{fmt(received)}</div>
+                                            </div>
+                                            <div>
+                                              <div className="text-[9px] text-muted-foreground leading-tight">A Receber</div>
+                                              <div className={`text-[11px] font-bold leading-tight ${pending > 0 ? "text-[hsl(45,95%,40%)]" : "text-success"}`}>{fmt(pending)}</div>
+                                            </div>
+                                            <div>
+                                              <div className="text-[9px] text-muted-foreground leading-tight">Lucro</div>
+                                              <div className={`text-[11px] font-bold leading-tight ${profit >= 0 ? "text-success" : "text-destructive"}`}>{fmt(profit)}</div>
+                                            </div>
                                           </div>
                                         </div>
                                       </Link>

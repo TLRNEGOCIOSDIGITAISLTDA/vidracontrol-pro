@@ -83,6 +83,7 @@ export interface Job {
   createdAt: string;
   expenses: Expense[];
   items?: JobItem[];
+  totalReceived?: number;
 }
 
 export type QuoteItemType =
