@@ -761,7 +761,13 @@ const AppDashboard = () => {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {jobs.map((job, i) => {
+                      {[...jobs].sort((a, b) => {
+                        const order: Record<JobStatus, number> = { em_andamento: 0, aguardando_pagamento: 1, finalizado: 2 };
+                        const sa = order[(a.status as JobStatus) || 'em_andamento'];
+                        const sb = order[(b.status as JobStatus) || 'em_andamento'];
+                        if (sa !== sb) return sa - sb;
+                        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                      }).map((job, i) => {
                         const expenses = job.expenses.reduce((s, e) => s + e.value, 0);
                         const profit = job.saleValue - expenses;
                         return (
