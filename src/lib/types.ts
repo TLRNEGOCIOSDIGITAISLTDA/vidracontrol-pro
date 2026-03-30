@@ -46,22 +46,18 @@ export interface JobItem {
   area?: number;
 }
 
-export type JobStatus = 'a_iniciar' | 'em_andamento' | 'aguardando_pagamento' | 'concluido' | 'finalizado';
+export type JobStatus = 'em_andamento' | 'aguardando_pagamento' | 'finalizado';
 
 export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
-  a_iniciar: 'A Iniciar',
   em_andamento: 'Em Andamento',
   aguardando_pagamento: 'Aguard. Pagamento',
-  concluido: 'Concluída',
   finalizado: 'Finalizado',
 };
 
 export const JOB_STATUS_COLORS: Record<JobStatus, string> = {
-  a_iniciar: 'bg-muted text-muted-foreground',
   em_andamento: 'bg-primary/10 text-primary',
   aguardando_pagamento: 'bg-[hsl(45,95%,50%)]/10 text-[hsl(45,95%,40%)]',
-  concluido: 'bg-success/10 text-success',
-  finalizado: 'bg-success/20 text-success font-semibold',
+  finalizado: 'bg-success/10 text-success',
 };
 
 export type PaymentMethod = 'Pix' | 'Dinheiro' | 'Cartão';

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Plus, Trash2, Camera, PieChart, CheckCircle, Upload, Loader2, Wallet, Pencil } from "lucide-react";
+import { Plus, Trash2, Camera, PieChart, Upload, Loader2, Wallet, Pencil, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,7 +47,7 @@ function parseDate(raw: string | null): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-const ALL_JOB_STATUSES: JobStatus[] = ['a_iniciar', 'em_andamento', 'aguardando_pagamento', 'concluido', 'finalizado'];
+const ALL_JOB_STATUSES: JobStatus[] = ['em_andamento', 'aguardando_pagamento', 'finalizado'];
 
 const JobDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -319,18 +319,28 @@ const JobDetail = () => {
             <div className="flex-1 min-w-0">
               <p className="text-sm text-muted-foreground truncate">{job.description || "Sem descrição"}</p>
             </div>
-            {/* Status select */}
-            <Select value={currentStatus} onValueChange={(v) => handleStatusChange(v as JobStatus)}>
-              <SelectTrigger className={`h-7 text-xs font-bold px-2 rounded-full border-0 w-auto shrink-0 ${JOB_STATUS_COLORS[currentStatus]}`}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ALL_JOB_STATUSES.map(s => (
-                  <SelectItem key={s} value={s}>{JOB_STATUS_LABELS[s]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Tag de status */}
+            <span className={`h-7 text-xs font-bold px-3 rounded-full inline-flex items-center shrink-0 ${JOB_STATUS_COLORS[currentStatus]}`}>
+              {JOB_STATUS_LABELS[currentStatus]}
+            </span>
           </div>
+
+          {/* Botão "Marcar como Entregue" — visível apenas quando em_andamento */}
+          {currentStatus === 'em_andamento' && (
+            <div className="pt-1">
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full gap-1.5 border-[hsl(45,95%,50%)] text-[hsl(45,95%,40%)] hover:bg-[hsl(45,95%,50%)]/10"
+                onClick={async () => {
+                  await handleStatusChange('aguardando_pagamento');
+                }}
+              >
+                <Package className="h-4 w-4" />
+                Marcar como Entregue
+              </Button>
+            </div>
+          )}
 
           <div className="grid grid-cols-3 gap-3 pt-1">
             <div>
@@ -568,12 +578,8 @@ const JobDetail = () => {
 
         {/* Actions */}
         <div className="flex gap-3">
-          <Button variant="outline" onClick={() => handleStatusChange(currentStatus === 'concluido' ? 'em_andamento' : 'concluido')} className="flex-1">
-            <CheckCircle className="h-4 w-4 mr-1" />
-            {currentStatus === 'concluido' ? 'Reabrir Obra' : 'Finalizar Obra'}
-          </Button>
-          <Button variant="destructive" onClick={handleDelete}>
-            <Trash2 className="h-4 w-4" />
+          <Button variant="destructive" onClick={handleDelete} className="w-full">
+            <Trash2 className="h-4 w-4 mr-1" /> Excluir Obra
           </Button>
         </div>
       </div>
