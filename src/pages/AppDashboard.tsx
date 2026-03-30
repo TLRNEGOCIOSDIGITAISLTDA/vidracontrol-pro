@@ -780,24 +780,32 @@ const AppDashboard = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      {[...jobs].sort((a, b) => {
-                        const order: Record<JobStatus, number> = { em_andamento: 0, aguardando_pagamento: 1, finalizado: 2 };
-                        const sa = order[(a.status as JobStatus) || 'em_andamento'];
-                        const sb = order[(b.status as JobStatus) || 'em_andamento'];
-                        if (sa !== sb) return sa - sb;
-                        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-                      }).map((job, i) => {
+                    <div className="space-y-5">
+                      {ALL_JOB_STATUSES.map(status => {
+                        const groupJobs = jobs
+                          .filter(j => ((j.status as JobStatus) || 'em_andamento') === status)
+                          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                        if (groupJobs.length === 0) return null;
+                        const groupTotal = groupJobs.reduce((s, j) => s + j.saleValue, 0);
+                        return (
+                          <div key={status}>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: JOB_STATUS_HEX[status] }} />
+                              <span className="text-sm font-bold text-foreground">{JOB_STATUS_LABELS[status]}</span>
+                              <span className="text-xs text-muted-foreground">({groupJobs.length}) — {fmt(groupTotal)}</span>
+                            </div>
+                            <div className="space-y-2">
+                              {groupJobs.map((job, i) => {
                         const expenses = job.expenses.reduce((s, e) => s + e.value, 0);
                         const profit = job.saleValue - expenses;
                         return (
-                          <motion.div key={job.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+                          <motion.div key={job.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
                             <Link to={`/app/obra/${job.id}`}>
                               <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow">
                                 <div className="flex items-center justify-between mb-2">
                                   <h3 className="font-bold text-foreground truncate">{job.clientName}</h3>
-                                  <span className={`text-xs px-2 py-1 rounded-full font-medium shrink-0 ml-2 ${JOB_STATUS_COLORS[(job.status as JobStatus) || 'em_andamento']}`}>
-                                    {JOB_STATUS_LABELS[(job.status as JobStatus) || 'em_andamento']}
+                                  <span className={`text-xs px-2 py-1 rounded-full font-medium shrink-0 ml-2 ${JOB_STATUS_COLORS[status]}`}>
+                                    {JOB_STATUS_LABELS[status]}
                                   </span>
                                 </div>
                                 <p className="text-sm text-muted-foreground truncate mb-3">{job.description}</p>
@@ -808,6 +816,10 @@ const AppDashboard = () => {
                               </div>
                             </Link>
                           </motion.div>
+                        );
+                              })}
+                            </div>
+                          </div>
                         );
                       })}
                     </div>
