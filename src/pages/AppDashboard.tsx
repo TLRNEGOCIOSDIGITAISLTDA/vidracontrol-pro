@@ -431,43 +431,41 @@ const AppDashboard = () => {
                                   transition={{ duration: 0.2 }}
                                   className="overflow-hidden"
                                 >
-                                  <div className="mt-3 pt-3 border-t border-border/50 space-y-3">
-                                    {/* Orçamentos do mês */}
+                                  <div className="mt-3 pt-3 border-t border-border/50 space-y-4">
+                                    {/* ── Orçamentos do mês ── */}
                                     {m.monthQuotes.length > 0 && (
                                       <div>
-                                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-2">Orçamentos</div>
-                                        <div className="space-y-1">
-                                          {(['orcado', 'enviado', 'aprovado', 'entregue', 'perdido'] as QuoteStatus[]).map(st => {
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <FileText className="h-3 w-3 text-muted-foreground" />
+                                          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Orçamentos</span>
+                                          <span className="text-[10px] text-muted-foreground">({m.monthQuotes.length})</span>
+                                        </div>
+                                        <div className="space-y-2 pl-1">
+                                          {(['orcado', 'enviado', 'perdido'] as QuoteStatus[]).map(st => {
                                             const group = m.monthQuotes.filter(q => (q.status || 'orcado') === st);
                                             if (group.length === 0) return null;
-                                            const emoji = st === 'orcado' ? '🟡' : st === 'enviado' ? '📤' : st === 'aprovado' ? '✅' : st === 'entregue' ? '📦' : '❌';
                                             return (
                                               <div key={st}>
-                                                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
-                                                  <span>{emoji}</span>
-                                                  <span>{QUOTE_STATUS_LABELS[st]}</span>
-                                                  <span className="ml-1 font-normal">({group.length})</span>
+                                                <div className="text-[10px] font-semibold text-muted-foreground mb-1 flex items-center gap-1.5">
+                                                  <span className={`w-1.5 h-1.5 rounded-full`} style={{ backgroundColor: QUOTE_STATUS_COLORS[st] }} />
+                                                  {QUOTE_STATUS_LABELS[st]} ({group.length})
                                                 </div>
-                                                <div className="space-y-0.5">
-                                                  {group.map(q => (
-                                                    <Link key={q.id} to={`/app/orcamento/${q.id}`}>
-                                                      <div className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 hover:bg-muted/60 active:bg-muted transition-colors min-h-[40px]">
-                                                        <div className="flex-1 min-w-0">
-                                                          <div className="text-sm font-medium text-foreground truncate">{q.clientName}</div>
-                                                          {q.jobType && (
-                                                            <div className="text-xs text-muted-foreground truncate">{q.jobType}</div>
-                                                          )}
-                                                        </div>
-                                                        <div className="flex items-center gap-2 shrink-0">
-                                                          <span className="text-sm font-bold text-foreground">{fmt(q.total)}</span>
-                                                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${QUOTE_STATUS_BG[st]}`}>
-                                                            {QUOTE_STATUS_LABELS[st]}
-                                                          </span>
-                                                        </div>
+                                                {group.map(q => (
+                                                  <Link key={q.id} to={`/app/orcamento/${q.id}`}>
+                                                    <div className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-muted/60 active:bg-muted transition-colors">
+                                                      <div className="flex-1 min-w-0">
+                                                        <div className="text-sm font-medium text-foreground truncate">{q.clientName}</div>
+                                                        {q.jobType && <div className="text-xs text-muted-foreground truncate">{q.jobType}</div>}
                                                       </div>
-                                                    </Link>
-                                                  ))}
-                                                </div>
+                                                      <div className="flex items-center gap-2 shrink-0">
+                                                        <span className="text-sm font-bold text-foreground">{fmt(q.total)}</span>
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${QUOTE_STATUS_BG[st]}`}>
+                                                          {QUOTE_STATUS_LABELS[st]}
+                                                        </span>
+                                                      </div>
+                                                    </div>
+                                                  </Link>
+                                                ))}
                                               </div>
                                             );
                                           })}
@@ -475,35 +473,41 @@ const AppDashboard = () => {
                                       </div>
                                     )}
 
-                                    {/* Obras do mês */}
+                                    {/* ── Obras do mês ── */}
                                     {m.monthJobs.length > 0 && (
-                                      <div className={m.monthQuotes.length > 0 ? "pt-2 border-t border-border/30" : ""}>
-                                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-2">Obras</div>
-                                        <div className="space-y-0.5">
-                                          {m.monthJobs.map(job => {
-                                            const st = (job.status as JobStatus) || 'em_andamento';
-                                            const tagClass = st === 'em_andamento'
-                                              ? 'bg-primary/10 text-primary'
-                                              : st === 'aguardando_pagamento'
-                                              ? 'bg-[hsl(45,95%,50%)]/10 text-[hsl(45,95%,40%)]'
-                                              : 'bg-success/10 text-success';
+                                      <div className={m.monthQuotes.length > 0 ? "pt-3 border-t border-border/40" : ""}>
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <Briefcase className="h-3 w-3 text-muted-foreground" />
+                                          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Obras</span>
+                                          <span className="text-[10px] text-muted-foreground">({m.monthJobs.length})</span>
+                                        </div>
+                                        <div className="space-y-2 pl-1">
+                                          {(ALL_JOB_STATUSES).map(st => {
+                                            const group = m.monthJobs.filter(j => ((j.status as JobStatus) || 'em_andamento') === st);
+                                            if (group.length === 0) return null;
                                             return (
-                                              <Link key={job.id} to={`/app/obra/${job.id}`}>
-                                                <div className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 hover:bg-muted/60 active:bg-muted transition-colors min-h-[40px]">
-                                                  <div className="flex-1 min-w-0">
-                                                    <div className="text-sm font-medium text-foreground truncate">{job.clientName}</div>
-                                                    {job.description && (
-                                                      <div className="text-xs text-muted-foreground truncate">{job.description}</div>
-                                                    )}
-                                                  </div>
-                                                  <div className="flex items-center gap-2 shrink-0">
-                                                    <span className="text-sm font-bold text-foreground">{fmt(job.saleValue)}</span>
-                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${tagClass}`}>
-                                                      {JOB_STATUS_LABELS[st]}
-                                                    </span>
-                                                  </div>
+                                              <div key={st}>
+                                                <div className="text-[10px] font-semibold text-muted-foreground mb-1 flex items-center gap-1.5">
+                                                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: JOB_STATUS_HEX[st] }} />
+                                                  {JOB_STATUS_LABELS[st]} ({group.length})
                                                 </div>
-                                              </Link>
+                                                {group.map(job => (
+                                                  <Link key={job.id} to={`/app/obra/${job.id}`}>
+                                                    <div className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-muted/60 active:bg-muted transition-colors">
+                                                      <div className="flex-1 min-w-0">
+                                                        <div className="text-sm font-medium text-foreground truncate">{job.clientName}</div>
+                                                        {job.description && <div className="text-xs text-muted-foreground truncate">{job.description}</div>}
+                                                      </div>
+                                                      <div className="flex items-center gap-2 shrink-0">
+                                                        <span className="text-sm font-bold text-foreground">{fmt(job.saleValue)}</span>
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${JOB_STATUS_COLORS[st]}`}>
+                                                          {JOB_STATUS_LABELS[st]}
+                                                        </span>
+                                                      </div>
+                                                    </div>
+                                                  </Link>
+                                                ))}
+                                              </div>
                                             );
                                           })}
                                         </div>
