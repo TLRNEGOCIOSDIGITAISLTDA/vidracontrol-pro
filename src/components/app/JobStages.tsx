@@ -6,10 +6,10 @@ import { toast } from "sonner";
 type StepKey = 'etapaMedicao' | 'etapaPedirVidro' | 'etapaFabricacao' | 'etapaInstalacao';
 
 const STEPS: { key: StepKey; label: string; short: string }[] = [
-  { key: 'etapaMedicao',    label: 'Medição',     short: 'Med.' },
-  { key: 'etapaPedirVidro', label: 'Pedir Vidro', short: 'Vidro' },
-  { key: 'etapaFabricacao', label: 'Fabricação',  short: 'Fab.' },
-  { key: 'etapaInstalacao', label: 'Instalação',  short: 'Inst.' },
+  { key: 'etapaMedicao',    label: 'Medição',                short: 'Medição' },
+  { key: 'etapaPedirVidro', label: 'Pedido do Vidro',        short: 'Pedido do Vidro' },
+  { key: 'etapaFabricacao', label: 'Fabricação do Alumínio', short: 'Fabricação do Alumínio' },
+  { key: 'etapaInstalacao', label: 'Instalação',             short: 'Instalação' },
 ];
 
 interface JobStagesProps {
@@ -51,7 +51,7 @@ export function JobStages({ job, onReload }: JobStagesProps) {
               key={step.key}
               type="button"
               onClick={() => handleToggle(step.key)}
-              className={`flex flex-col items-center gap-1 rounded-lg p-2 text-center transition-colors border ${
+              className={`flex flex-col items-center gap-1.5 rounded-lg px-1.5 py-2.5 text-center transition-colors border ${
                 isDone
                   ? 'bg-success/10 border-success/30 text-success'
                   : isNext
@@ -59,8 +59,8 @@ export function JobStages({ job, onReload }: JobStagesProps) {
                   : 'bg-muted/40 border-border/30 text-muted-foreground'
               }`}
             >
-              <span className="text-base leading-none">{isDone ? '✓' : String(idx + 1)}</span>
-              <span className="text-[10px] font-semibold leading-tight">{step.short}</span>
+              <span className="text-sm font-bold leading-none">{isDone ? '✓' : String(idx + 1)}</span>
+              <span className="text-[9px] font-semibold leading-tight break-words hyphens-auto w-full">{step.short}</span>
             </button>
           );
         })}

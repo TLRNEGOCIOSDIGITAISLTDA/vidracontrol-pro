@@ -427,7 +427,7 @@ const JobDetail = () => {
               activeTab === 'anotacoes' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            Notas{notes.length > 0 ? ` (${notes.length})` : ''}
+            Anotações{notes.length > 0 ? ` (${notes.length})` : ''}
           </button>
         </div>
 
