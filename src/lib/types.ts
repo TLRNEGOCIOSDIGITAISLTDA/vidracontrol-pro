@@ -90,6 +90,15 @@ export interface Job {
   etapaInstalacao?: boolean;
 }
 
+export interface JobNote {
+  id: string;
+  jobId: string;
+  userId: string;
+  texto: string;
+  fotoUrl?: string;
+  createdAt: string;
+}
+
 export type QuoteItemType =
   | 'vidro_comum'
   | 'vidro_temperado'

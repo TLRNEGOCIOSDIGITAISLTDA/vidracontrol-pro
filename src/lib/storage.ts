@@ -725,6 +725,60 @@ export async function updateQuote(quote: Quote): Promise<void> {
   await logAudit('update', 'quote', quote.id, { clientName: quote.clientName });
 }
 
+// ---- Job Notes ----
+
+export async function getJobNotes(jobId: string): Promise<import('./types').JobNote[]> {
+  const { data } = await supabase
+    .from('job_notes' as any)
+    .select('*')
+    .eq('job_id', jobId)
+    .order('created_at', { ascending: false });
+  return ((data as any[]) || []).map((r: any) => ({
+    id: r.id,
+    jobId: r.job_id,
+    userId: r.user_id,
+    texto: r.texto,
+    fotoUrl: r.foto_url || undefined,
+    createdAt: r.created_at,
+  }));
+}
+
+export async function addJobNote(
+  jobId: string,
+  note: { texto: string; fotoUrl?: string }
+): Promise<import('./types').JobNote | null> {
+  const uid = await getUserId();
+  const { data, error } = await supabase
+    .from('job_notes' as any)
+    .insert({ job_id: jobId, user_id: uid, texto: note.texto, foto_url: note.fotoUrl || null } as any)
+    .select()
+    .single();
+  if (error || !data) return null;
+  const r = data as any;
+  return { id: r.id, jobId: r.job_id, userId: r.user_id, texto: r.texto, fotoUrl: r.foto_url || undefined, createdAt: r.created_at };
+}
+
+export async function deleteJobNote(noteId: string): Promise<void> {
+  const uid = await getUserId();
+  await supabase.from('job_notes' as any).delete().eq('id', noteId).eq('user_id', uid);
+}
+
+export async function uploadJobPhoto(file: File): Promise<string | null> {
+  try {
+    const uid = await getUserId();
+    const ext = file.name.split('.').pop() || 'jpg';
+    const fileName = `${uid}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage
+      .from('job-photos')
+      .upload(fileName, file, { upsert: false, contentType: file.type });
+    if (error) return null;
+    const { data } = supabase.storage.from('job-photos').getPublicUrl(fileName);
+    return data.publicUrl;
+  } catch {
+    return null;
+  }
+}
+
 // ---- Clear all data ----
 export async function clearAllData() {
   const uid = await getUserId();

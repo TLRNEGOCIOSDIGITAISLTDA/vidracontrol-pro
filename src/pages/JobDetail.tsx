@@ -9,10 +9,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import AppHeader from "@/components/app/AppHeader";
 import { JobStages } from "@/components/app/JobStages";
-import { getJob, addExpense, deleteExpense, updateExpense, updateJob, getJobPayments, addJobPayment, deleteJobPayment, updateJobPayment } from "@/lib/storage";
+import { JobNotes } from "@/components/app/JobNotes";
+import { getJob, addExpense, deleteExpense, updateExpense, updateJob, getJobPayments, addJobPayment, deleteJobPayment, updateJobPayment, getJobNotes } from "@/lib/storage";
 import { CurrencyInput, parseCurrency, numericToDisplay } from "@/components/app/CurrencyInput";
 import { useData } from "@/lib/DataContext";
-import { Job, JobPayment, PaymentMethod, PAYMENT_METHODS, JobStatus, JOB_STATUS_LABELS, JOB_STATUS_COLORS, ExpenseCategory, CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/types";
+import { Job, JobNote, JobPayment, PaymentMethod, PAYMENT_METHODS, JobStatus, JOB_STATUS_LABELS, JOB_STATUS_COLORS, ExpenseCategory, CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/types";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -57,7 +58,8 @@ const JobDetail = () => {
 
   const [job, setJob] = useState<Job | null>(null);
   const [payments, setPayments] = useState<JobPayment[]>([]);
-  const [activeTab, setActiveTab] = useState<'custos' | 'recebimentos'>('custos');
+  const [notes, setNotes] = useState<JobNote[]>([]);
+  const [activeTab, setActiveTab] = useState<'custos' | 'recebimentos' | 'anotacoes'>('custos');
 
   // Expense dialog
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -99,9 +101,10 @@ const JobDetail = () => {
 
   const reload = async () => {
     if (!id) return;
-    const [j, pays] = await Promise.all([getJob(id), getJobPayments(id)]);
+    const [j, pays, ns] = await Promise.all([getJob(id), getJobPayments(id), getJobNotes(id)]);
     setJob(j || null);
     setPayments(pays);
+    setNotes(ns);
   };
 
   useEffect(() => { reload(); }, [id]);
@@ -408,7 +411,7 @@ const JobDetail = () => {
               activeTab === 'custos' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            Custos da Obra
+            Custos
           </button>
           <button
             onClick={() => setActiveTab('recebimentos')}
@@ -416,7 +419,15 @@ const JobDetail = () => {
               activeTab === 'recebimentos' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            <Wallet className="h-3.5 w-3.5" /> Recebimentos
+            <Wallet className="h-3.5 w-3.5" /> Pgto
+          </button>
+          <button
+            onClick={() => setActiveTab('anotacoes')}
+            className={`flex-1 text-sm font-bold py-2 rounded-lg transition-colors ${
+              activeTab === 'anotacoes' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Notas{notes.length > 0 ? ` (${notes.length})` : ''}
           </button>
         </div>
 
@@ -578,6 +589,11 @@ const JobDetail = () => {
               </div>
             )}
           </>
+        )}
+
+        {/* ===== ABA ANOTAÇÕES ===== */}
+        {activeTab === 'anotacoes' && (
+          <JobNotes jobId={job.id} notes={notes} onReload={reload} />
         )}
 
         {/* Actions */}
