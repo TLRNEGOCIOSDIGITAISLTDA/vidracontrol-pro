@@ -182,8 +182,9 @@ function KanbanColumn({
 }
 
 // ===== BOARD KANBAN EXPORTADO =====
-export function QuoteKanban({ novoId }: { novoId?: string | null }) {
-  const { quotes, changeQuoteStatus } = useData();
+export function QuoteKanban({ novoId, quotes: quotesOverride }: { novoId?: string | null; quotes?: Quote[] }) {
+  const { quotes: contextQuotes, changeQuoteStatus } = useData();
+  const quotes = quotesOverride ?? contextQuotes;
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });

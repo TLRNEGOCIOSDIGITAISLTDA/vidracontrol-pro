@@ -22,7 +22,7 @@ const JOB_STATUS_HEX: Record<JobStatus, string> = {
 
 const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
-type Period = 'mes' | 'mes_passado' | 'ano';
+type Period = 'mes' | 'mes_passado' | 'ano' | 'escolher_mes';
 
 const HighlightCard = ({ children, className = "", lastUpdate }: { children: React.ReactNode; className?: string; lastUpdate: number }) => {
   const [flash, setFlash] = useState(false);
@@ -75,10 +75,24 @@ const AppDashboard = () => {
   const [period, setPeriod] = useState<Period>(
     () => (localStorage.getItem('dashPeriod') as Period) || 'mes'
   );
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    const now = new Date();
+    return localStorage.getItem('dashSelectedMonth') || `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}`;
+  });
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
 
   const changePeriod = (p: Period) => {
     setPeriod(p);
     localStorage.setItem('dashPeriod', p);
+    if (p !== 'escolher_mes') setMonthPickerOpen(false);
+  };
+
+  const changeSelectedMonth = (key: string) => {
+    setSelectedMonth(key);
+    localStorage.setItem('dashSelectedMonth', key);
+    setMonthPickerOpen(false);
+    setPeriod('escolher_mes');
+    localStorage.setItem('dashPeriod', 'escolher_mes');
   };
 
   const { periodStart, periodEnd } = useMemo(() => {
@@ -95,12 +109,19 @@ const AppDashboard = () => {
         periodEnd: new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59),
       };
     }
+    if (period === 'escolher_mes') {
+      const [y, m] = selectedMonth.split('-').map(Number);
+      return {
+        periodStart: new Date(y, m, 1),
+        periodEnd: new Date(y, m + 1, 0, 23, 59, 59),
+      };
+    }
     // ano
     return {
       periodStart: new Date(now.getFullYear(), 0, 1),
       periodEnd: new Date(now.getFullYear(), 11, 31, 23, 59, 59),
     };
-  }, [period]);
+  }, [period, selectedMonth]);
 
   const filteredJobs = useMemo(() =>
     jobs.filter(j => {
@@ -151,7 +172,7 @@ const AppDashboard = () => {
 
   // ── Dados de orçamentos para gráficos ───────────────────────
   const quotesByStatus = ALL_STATUSES.map((status) => {
-    const filtered = quotes.filter((q) => (q.status || "orcado") === status);
+    const filtered = filteredQuotes.filter((q) => (q.status || "orcado") === status);
     return {
       status,
       label: QUOTE_STATUS_LABELS[status],
@@ -164,7 +185,7 @@ const AppDashboard = () => {
 
   const qtyData = quotesByStatus.filter(d => d.count > 0).map(d => ({ name: d.label, value: d.count, color: d.color }));
   const valueData = quotesByStatus.filter(d => d.total > 0).map(d => ({ name: d.label, value: d.total, color: d.color }));
-  const hasQuotes = quotes.length > 0;
+  const hasQuotes = filteredQuotes.length > 0;
 
   // ── Estado persistido ────────────────────────────────────────
   const [quotesOpen, setQuotesOpen] = useState(false);
@@ -225,6 +246,25 @@ const AppDashboard = () => {
       });
   }, [jobs, quotes, paymentsByMonth]);
 
+  // ── Meses disponíveis (com dados) ───────────────────────────
+  const availableMonths = useMemo(() => {
+    const keys = new Set<string>();
+    jobs.forEach(j => {
+      const d = new Date(j.createdAt);
+      keys.add(`${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`);
+    });
+    quotes.forEach(q => {
+      const d = new Date(q.createdAt);
+      keys.add(`${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`);
+    });
+    return Array.from(keys).sort().reverse();
+  }, [jobs, quotes]);
+
+  const monthKeyToLabel = (key: string) => {
+    const [y, m] = key.split('-').map(Number);
+    return `${MONTH_NAMES[m]} ${y}`;
+  };
+
   const renderLabel = ({ percent }: { percent: number }) =>
     percent > 0 ? `${(percent * 100).toFixed(0)}%` : "";
 
@@ -232,7 +272,18 @@ const AppDashboard = () => {
     mes: 'Este Mês',
     mes_passado: 'Mês Passado',
     ano: 'Ano Todo',
+    escolher_mes: monthKeyToLabel(selectedMonth),
   };
+
+  // Filtra monthlyData para o período atual (tudo para 'ano', só o mês para outros)
+  const visibleMonthlyData = useMemo(() => {
+    if (period === 'ano') return monthlyData;
+    return monthlyData.filter(m => {
+      const entry = new Date(periodStart.getFullYear(), periodStart.getMonth(), 1);
+      const [ey, em] = m.key.split('-').map(Number);
+      return ey === entry.getFullYear() && em === entry.getMonth();
+    });
+  }, [monthlyData, period, periodStart]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -304,24 +355,73 @@ const AppDashboard = () => {
           </HighlightCard>
         </div>
 
-        {/* Seletor de período — abaixo dos KPIs */}
-        <div className="flex items-center gap-1 bg-muted rounded-xl p-1">
-          {(['mes', 'mes_passado', 'ano'] as Period[]).map(p => (
+        {/* Seletor de período */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-1 bg-muted rounded-xl p-1">
+            {(['mes', 'mes_passado', 'ano'] as Period[]).map(p => (
+              <button
+                key={p}
+                onClick={() => changePeriod(p)}
+                className={`flex-1 text-xs font-medium py-1.5 px-1 rounded-lg transition-colors ${
+                  period === p
+                    ? 'bg-card shadow-sm text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {PERIOD_LABELS[p]}
+              </button>
+            ))}
             <button
-              key={p}
-              onClick={() => changePeriod(p)}
-              className={`flex-1 text-xs font-medium py-1.5 px-2 rounded-lg transition-colors ${
-                period === p
+              onClick={() => { setMonthPickerOpen(v => !v); if (period !== 'escolher_mes') setPeriod('escolher_mes'); }}
+              className={`flex-1 text-xs font-medium py-1.5 px-1 rounded-lg transition-colors flex items-center justify-center gap-1 ${
+                period === 'escolher_mes'
                   ? 'bg-card shadow-sm text-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              {PERIOD_LABELS[p]}
+              <CalendarDays className="h-3 w-3 shrink-0" />
+              <span className="truncate">{period === 'escolher_mes' ? monthKeyToLabel(selectedMonth) : 'Mês'}</span>
             </button>
-          ))}
+          </div>
+
+          {/* Month picker dropdown */}
+          <AnimatePresence>
+            {monthPickerOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="bg-card rounded-xl shadow-card p-3 border border-border/50">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-2">Selecionar mês</p>
+                  {availableMonths.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-2">Nenhum dado disponível</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {availableMonths.map(key => (
+                        <button
+                          key={key}
+                          onClick={() => changeSelectedMonth(key)}
+                          className={`text-xs py-1.5 px-2 rounded-lg text-left transition-colors ${
+                            selectedMonth === key && period === 'escolher_mes'
+                              ? 'bg-primary text-primary-foreground font-semibold'
+                              : 'bg-muted hover:bg-muted/80 text-foreground'
+                          }`}
+                        >
+                          {monthKeyToLabel(key)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-        <p className="text-[11px] text-muted-foreground -mt-4 text-center">
-          Vendas, Custos, Lucro, Margem e Conversão filtrados por: <strong>{PERIOD_LABELS[period]}</strong>
+        <p className="text-[11px] text-muted-foreground -mt-2 text-center">
+          KPIs, Orçamentos e Obras filtrados por: <strong>{PERIOD_LABELS[period]}</strong>
           {' '}· Recebido e A Receber são totais gerais
         </p>
 
@@ -348,18 +448,18 @@ const AppDashboard = () => {
                   className="overflow-hidden"
                 >
                   <div className="mt-4 space-y-4">
-                    {monthlyData.length > 1 && (
+                    {visibleMonthlyData.length > 1 && (
                       <div className="bg-card rounded-xl p-4 shadow-card">
                         <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-3">Evolução do Lucro</h3>
                         <div className="h-40">
                           <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={[...monthlyData].reverse()}>
+                            <BarChart data={[...visibleMonthlyData].reverse()}>
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                               <XAxis dataKey="month" tick={{ fontSize: 9 }} tickFormatter={(v: string) => v.split(' ')[0].slice(0, 3)} />
                               <YAxis tick={{ fontSize: 9 }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`} />
                               <Tooltip formatter={(v: number) => fmt(v)} labelFormatter={(l: string) => l} />
                               <Bar dataKey="profit" name="Lucro" radius={[4, 4, 0, 0]}>
-                                {[...monthlyData].reverse().map((entry, i) => (
+                                {[...visibleMonthlyData].reverse().map((entry, i) => (
                                   <Cell key={i} fill={entry.profit >= 0 ? 'hsl(var(--success))' : 'hsl(var(--destructive))'} />
                                 ))}
                               </Bar>
@@ -369,7 +469,7 @@ const AppDashboard = () => {
                       </div>
                     )}
                     <div className="space-y-3">
-                      {monthlyData.map((m, i) => {
+                      {visibleMonthlyData.map((m, i) => {
                         const indicator = m.profit < 0
                           ? 'border-l-destructive bg-destructive/5'
                           : m.margin < 20
@@ -636,13 +736,13 @@ const AppDashboard = () => {
                 className="overflow-hidden"
               >
                 <div className="pt-4">
-                  {quotes.length === 0 ? (
+                  {filteredQuotes.length === 0 ? (
                     <div className="text-center py-10">
                       <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
-                      <p className="text-muted-foreground">Nenhum orçamento ainda.</p>
+                      <p className="text-muted-foreground">Nenhum orçamento no período.</p>
                     </div>
                   ) : quotesView === "kanban" ? (
-                    <QuoteKanban />
+                    <QuoteKanban quotes={filteredQuotes} />
                   ) : (
                     <div className="space-y-4">
                       {quotesByStatus.filter(g => g.count > 0).map((group) => (
@@ -712,11 +812,10 @@ const AppDashboard = () => {
                 className="overflow-hidden"
               >
                 <div className="pt-4">
-                  {jobs.length === 0 ? (
+                  {filteredJobs.length === 0 ? (
                     <div className="text-center py-10">
                       <Briefcase className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
-                      <p className="text-muted-foreground">Nenhuma obra ainda.</p>
-                      <p className="text-muted-foreground text-sm">Clique em "Nova" para começar!</p>
+                      <p className="text-muted-foreground">Nenhuma obra no período.</p>
                     </div>
                   ) : jobsView === "kanban" ? (
                     <div>
@@ -724,7 +823,7 @@ const AppDashboard = () => {
                       <div className="overflow-x-auto pb-4 -mx-4 px-4">
                         <div className="flex gap-3" style={{ minWidth: "max-content" }}>
                           {ALL_JOB_STATUSES.map((status) => {
-                            const colJobs = jobs.filter(j => (j.status as JobStatus || 'em_andamento') === status);
+                            const colJobs = filteredJobs.filter(j => (j.status as JobStatus || 'em_andamento') === status);
                             const colTotal = colJobs.reduce((s, j) => s + j.saleValue, 0);
                             return (
                               <div key={status} className="flex flex-col w-[220px] flex-shrink-0">
@@ -782,7 +881,7 @@ const AppDashboard = () => {
                   ) : (
                     <div className="space-y-5">
                       {ALL_JOB_STATUSES.map(status => {
-                        const groupJobs = jobs
+                        const groupJobs = filteredJobs
                           .filter(j => ((j.status as JobStatus) || 'em_andamento') === status)
                           .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
                         if (groupJobs.length === 0) return null;
