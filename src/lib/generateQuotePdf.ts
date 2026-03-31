@@ -312,6 +312,19 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string, disp
   doc.text('Cliente', ML + 40, y + 5, { align: 'center' });
   doc.text(t(co.name || 'Empresa'), PW - MR - 40, y + 5, { align: 'center' });
 
+  // ── Rodapé: agradecimento ────────────────────────────────────
+  doc.setDrawColor(200, 210, 230);
+  doc.setLineWidth(0.3);
+  doc.line(ML, y + 12, PW - MR, y + 12);
+  doc.setFontSize(9.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...ACCENT);
+  doc.text(t('Obrigado pela preferencia!'), PW / 2, y + 19, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(120, 130, 150);
+  doc.text(t('Estamos a disposicao para qualquer duvida ou esclarecimento.'), PW / 2, y + 25, { align: 'center' });
+
   doc.setFontSize(7);
   doc.setTextColor(160, 160, 160);
   doc.text(
