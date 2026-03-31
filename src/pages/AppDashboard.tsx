@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { toast } from "sonner";
 import { QuoteKanban } from "@/components/app/QuoteKanban";
+import { JobStepDots } from "@/components/app/JobStepDots";
 import { supabase } from "@/integrations/supabase/client";
 
 const ALL_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'aprovado', 'entregue', 'perdido'];
@@ -851,7 +852,8 @@ const AppDashboard = () => {
                                       <Link key={job.id} to={`/app/obra/${job.id}`}>
                                         <div className="bg-card rounded-xl border border-border/50 shadow-card hover:shadow-elevated transition-shadow p-3 mb-2">
                                           <h3 className="font-bold text-foreground text-sm leading-tight truncate">{job.clientName}</h3>
-                                          {job.description && <p className="text-[11px] text-muted-foreground truncate mb-2">{job.description}</p>}
+                                          {job.description && <p className="text-[11px] text-muted-foreground truncate mb-1">{job.description}</p>}
+                                          <JobStepDots status={job.status} etapaMedicao={job.etapaMedicao} etapaPedirVidro={job.etapaPedirVidro} etapaFabricacao={job.etapaFabricacao} etapaInstalacao={job.etapaInstalacao} />
                                           <div className="grid grid-cols-2 gap-x-2 gap-y-1 mt-1.5">
                                             <div>
                                               <div className="text-[9px] text-muted-foreground leading-tight">Total</div>
@@ -915,8 +917,9 @@ const AppDashboard = () => {
                                     {JOB_STATUS_LABELS[status]}
                                   </span>
                                 </div>
-                                <p className="text-sm text-muted-foreground truncate mb-3">{job.description}</p>
-                                <div className="flex items-center gap-4 text-sm">
+                                {job.description && <p className="text-sm text-muted-foreground truncate mb-1">{job.description}</p>}
+                                <JobStepDots status={job.status} etapaMedicao={job.etapaMedicao} etapaPedirVidro={job.etapaPedirVidro} etapaFabricacao={job.etapaFabricacao} etapaInstalacao={job.etapaInstalacao} />
+                                <div className="flex items-center gap-4 text-sm mt-2">
                                   <span className="text-muted-foreground">Venda: <strong className="text-foreground">{fmt(job.saleValue)}</strong></span>
                                   <span className="text-muted-foreground">Lucro: <strong className={profit >= 0 ? "text-success" : "text-destructive"}>{fmt(profit)}</strong></span>
                                 </div>

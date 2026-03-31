@@ -246,6 +246,10 @@ export async function getJobs(): Promise<Job[]> {
     status: r.status as any,
     createdAt: r.created_at,
     totalReceived: (payments || []).filter(p => p.job_id === r.id).reduce((s: number, p: any) => s + Number(p.amount), 0),
+    etapaMedicao: (r as any).etapa_medicao ?? false,
+    etapaPedirVidro: (r as any).etapa_pedir_vidro ?? false,
+    etapaFabricacao: (r as any).etapa_fabricacao ?? false,
+    etapaInstalacao: (r as any).etapa_instalacao ?? false,
     items: (items || []).filter(i => i.job_id === r.id).map(i => ({
       id: i.id,
       type: i.type as any,
@@ -320,6 +324,10 @@ export async function updateJob(id: string, data: Partial<Job>): Promise<Job | n
   if (data.description !== undefined) update.description = data.description;
   if (data.saleValue !== undefined) update.sale_value = data.saleValue;
   if (data.status !== undefined) update.status = data.status;
+  if (data.etapaMedicao !== undefined) update.etapa_medicao = data.etapaMedicao;
+  if (data.etapaPedirVidro !== undefined) update.etapa_pedir_vidro = data.etapaPedirVidro;
+  if (data.etapaFabricacao !== undefined) update.etapa_fabricacao = data.etapaFabricacao;
+  if (data.etapaInstalacao !== undefined) update.etapa_instalacao = data.etapaInstalacao;
 
   await supabase.from('jobs').update(update).eq('id', id).eq('user_id', uid);
   await logAudit('update', 'job', id, update);

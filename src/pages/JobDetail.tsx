@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import AppHeader from "@/components/app/AppHeader";
+import { JobStages } from "@/components/app/JobStages";
 import { getJob, addExpense, deleteExpense, updateExpense, updateJob, getJobPayments, addJobPayment, deleteJobPayment, updateJobPayment } from "@/lib/storage";
 import { CurrencyInput, parseCurrency, numericToDisplay } from "@/components/app/CurrencyInput";
 import { useData } from "@/lib/DataContext";
@@ -395,6 +396,9 @@ const JobDetail = () => {
             )}
           </div>
         </div>
+
+        {/* Etapas da Obra */}
+        <JobStages job={job} onReload={reload} />
 
         {/* Tabs */}
         <div className="flex gap-1 bg-muted rounded-xl p-1">

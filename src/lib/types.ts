@@ -84,6 +84,10 @@ export interface Job {
   expenses: Expense[];
   items?: JobItem[];
   totalReceived?: number;
+  etapaMedicao?: boolean;
+  etapaPedirVidro?: boolean;
+  etapaFabricacao?: boolean;
+  etapaInstalacao?: boolean;
 }
 
 export type QuoteItemType =
