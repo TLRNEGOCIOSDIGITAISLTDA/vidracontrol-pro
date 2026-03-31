@@ -111,10 +111,14 @@ const Profile = () => {
         if (uploaded) {
           logoUrl = uploaded;
         } else {
-          toast.error("Erro ao fazer upload do logo. Salvando demais dados.");
+          toast.error("Erro ao enviar a logo. Verifique sua conexão e tente novamente.");
+          return;
         }
       }
       await saveCompanyInfo({ ...company, logoUrl, addressFields: addrFields });
+      // Atualiza estado local para que salvamentos futuros preservem a URL
+      setCompany(c => ({ ...c, logoUrl }));
+      if (logoUrl) setLogoPreview(logoUrl);
       setLogoFile(null);
       toast.success("Dados da empresa salvos!");
     } catch {
