@@ -144,21 +144,7 @@ const AppDashboard = () => {
     ? (filteredQuotes.filter(q => (q.status || 'orcado') === 'aprovado').length / filteredQuotes.length) * 100
     : 0;
 
-  // Total Recebido / A Receber — filtrados pelo período selecionado
-  const periodReceived = useMemo(() => {
-    let sum = 0;
-    paymentsByMonth.forEach((amount, key) => {
-      const [y, m] = key.split('-').map(Number);
-      const keyDate = new Date(y, m, 1);
-      if (keyDate >= periodStart && keyDate <= periodEnd) sum += amount;
-    });
-    return sum;
-  }, [paymentsByMonth, periodStart, periodEnd]);
-  const periodPending = Math.max(0, totalSales - periodReceived);
-
-  const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-
-  // ── Pagamentos por mês (para "Ver por Mês") ──────────────────
+  // ── Pagamentos por mês (deve ser declarado antes de periodReceived) ─
   const [paymentsByMonth, setPaymentsByMonth] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
@@ -178,6 +164,20 @@ const AppDashboard = () => {
       setPaymentsByMonth(map);
     })();
   }, [lastUpdate]);
+
+  // Total Recebido / A Receber — filtrados pelo período selecionado
+  const periodReceived = useMemo(() => {
+    let sum = 0;
+    paymentsByMonth.forEach((amount, key) => {
+      const [y, m] = key.split('-').map(Number);
+      const keyDate = new Date(y, m, 1);
+      if (keyDate >= periodStart && keyDate <= periodEnd) sum += amount;
+    });
+    return sum;
+  }, [paymentsByMonth, periodStart, periodEnd]);
+  const periodPending = Math.max(0, totalSales - periodReceived);
+
+  const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   // ── Dados de orçamentos para gráficos ───────────────────────
   const quotesByStatus = ALL_STATUSES.map((status) => {
