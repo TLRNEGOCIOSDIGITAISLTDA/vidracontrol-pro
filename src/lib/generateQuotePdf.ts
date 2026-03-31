@@ -18,16 +18,29 @@ function t(str: string): string {
     .replace(/[^\x00-\xFF]/g, '?');          // demais chars fora Latin-1 → ?
 }
 
-async function loadImageBase64(url: string): Promise<string | null> {
+type ImageResult = { dataUrl: string; width: number; height: number; format: 'PNG' | 'JPEG' | 'WEBP' };
+
+async function loadImageBase64(url: string): Promise<ImageResult | null> {
   try {
     const res = await fetch(url);
+    if (!res.ok) return null;
     const blob = await res.blob();
-    return await new Promise<string>((resolve, reject) => {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(null);
+      reader.onerror = () => reject(new Error('FileReader error'));
       reader.readAsDataURL(blob);
     });
+    const dims = await new Promise<{ width: number; height: number }>((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = () => resolve({ width: 0, height: 0 });
+      img.src = dataUrl;
+    });
+    const format: 'PNG' | 'JPEG' | 'WEBP' =
+      dataUrl.startsWith('data:image/png') ? 'PNG' :
+      dataUrl.startsWith('data:image/webp') ? 'WEBP' : 'JPEG';
+    return { dataUrl, format, ...dims };
   } catch {
     return null;
   }
@@ -62,19 +75,32 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string, disp
   doc.setFillColor(...NAVY);
   doc.rect(0, 0, PW, HEADER_H, 'F');
 
-  let logoBase64: string | null = null;
-  if (co.logoUrl) logoBase64 = await loadImageBase64(co.logoUrl);
+  let logoResult: ImageResult | null = null;
+  if (co.logoUrl) logoResult = await loadImageBase64(co.logoUrl);
 
-  const LOGO_W = 36, LOGO_H = 30;
-  const LOGO_X = ML, LOGO_Y = (HEADER_H - LOGO_H) / 2;
+  // Dimensões máximas da logo; respeitar proporção real da imagem
+  const MAX_LOGO_W = 36, MAX_LOGO_H = 30;
+  let logoW = MAX_LOGO_W, logoH = MAX_LOGO_H;
+  if (logoResult && logoResult.width > 0 && logoResult.height > 0) {
+    const ratio = logoResult.width / logoResult.height;
+    if (ratio > MAX_LOGO_W / MAX_LOGO_H) {
+      logoW = MAX_LOGO_W;
+      logoH = MAX_LOGO_W / ratio;
+    } else {
+      logoH = MAX_LOGO_H;
+      logoW = MAX_LOGO_H * ratio;
+    }
+  }
+  const LOGO_X = ML;
+  const LOGO_Y = (HEADER_H - logoH) / 2;
 
   let textX = ML;
-  if (logoBase64) {
+  if (logoResult) {
     try {
       doc.setFillColor(...WHITE);
-      doc.roundedRect(LOGO_X - 1, LOGO_Y - 1, LOGO_W + 2, LOGO_H + 2, 2, 2, 'F');
-      doc.addImage(logoBase64, 'JPEG', LOGO_X, LOGO_Y, LOGO_W, LOGO_H);
-      textX = LOGO_X + LOGO_W + 7;
+      doc.roundedRect(LOGO_X - 1, LOGO_Y - 1, logoW + 2, logoH + 2, 2, 2, 'F');
+      doc.addImage(logoResult.dataUrl, logoResult.format, LOGO_X, LOGO_Y, logoW, logoH);
+      textX = LOGO_X + logoW + 7;
     } catch { textX = ML; }
   }
 
