@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, FileText, MessageSquare } from "lucide-react";
+import { Send, FileText, Download, Share2 } from "lucide-react";
 import { Quote, QuoteStatus } from "@/lib/types";
 import { toast } from "sonner";
-import { getProfile } from "@/lib/storage";
+import { getProfile, getCompanyInfo } from "@/lib/storage";
 import { generateQuotePdf } from "@/lib/generateQuotePdf";
 import { maskWhatsApp } from "@/lib/whatsappMask";
 
@@ -13,22 +13,22 @@ interface Props {
 }
 
 export function QuoteSendMenu({ quote, onStatusChange, size = "sm" }: Props) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pdfOpen, setPdfOpen] = useState(false);
+  const pdfRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!pdfOpen) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (pdfRef.current && !pdfRef.current.contains(e.target as Node)) setPdfOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  }, [pdfOpen]);
 
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-  const handleText = async () => {
-    setOpen(false);
+  // ── WhatsApp: ação direta, mensagem simples com link público ──────────────
+  const handleWhatsApp = async () => {
     const phone = quote.clientPhone?.replace(/\D/g, "");
     if (!phone || phone.length !== 11) {
       toast.error("Telefone do cliente não cadastrado.");
@@ -36,101 +36,122 @@ export function QuoteSendMenu({ quote, onStatusChange, size = "sm" }: Props) {
     }
 
     const profile = await getProfile();
-    const companyName = quote.companyInfo?.name || profile?.fullName || "Empresa";
-    const displayUnit = profile?.defaultUnit ?? 'mm';
+    const sellerName = profile?.fullName || "";
+    const companyName = quote.companyInfo?.name || "";
+    const quoteLink = `${window.location.origin}/orcamento-publico/${quote.id}`;
 
-    const itemLines = quote.items
-      .map((item) => {
-        const hasDims = item.width && item.height;
-        const dw = hasDims ? (displayUnit === 'cm' ? item.width! / 10 : item.width!) : 0;
-        const dh = hasDims ? (displayUnit === 'cm' ? item.height! / 10 : item.height!) : 0;
-        const dimsStr = hasDims ? ` (${dw}${displayUnit}×${dh}${displayUnit})` : "";
-        return `• ${item.description}${dimsStr} — ${item.quantity}x ${fmt(item.unitPrice)} = ${fmt(item.total)}`;
-      })
-      .join("\n");
+    const lines = [
+      `Ola, ${quote.clientName}! Tudo bem?`,
+      ``,
+      `Segue seu orcamento conforme solicitado:`,
+      quoteLink,
+      ``,
+      `Valor total: ${fmt(quote.total)}`,
+      ``,
+      `Qualquer duvida, estou a disposicao.`,
+      ``,
+      `Atenciosamente,`,
+      ...(sellerName ? [sellerName] : []),
+      ...(companyName ? [companyName] : []),
+    ];
 
-    const numLabel = quote.quoteNumber ? ` (N ${quote.quoteNumber})` : "";
-    const msg = [
-      `Ola ${quote.clientName}! Segue o orcamento${numLabel} conforme solicitado:`,
-      "",
-      `*${companyName.toUpperCase()}*`,
-      "",
-      `*Itens do orcamento:*`,
-      itemLines,
-      "",
-      `*Valor total: ${fmt(quote.total)}*`,
-      `Validade: 7 dias uteis`,
-      ...(quote.rtName ? [`Responsavel Tecnico: ${quote.rtName}`] : []),
-      "",
-      `Qualquer duvida estou a disposicao!`,
-      `Att, ${companyName}`,
-    ].join("\n");
-
+    const msg = lines.join("\n");
     await onStatusChange(quote.id, "enviado");
     window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, "_blank");
-    toast.success("Enviado! WhatsApp aberto.");
+    toast.success("WhatsApp aberto!");
   };
 
-  const handlePdf = async () => {
-    setOpen(false);
-    const profile = await getProfile();
+  // ── PDF: busca logo fresca antes de gerar ─────────────────────────────────
+  const buildPdfDoc = async () => {
+    const [profile, freshCompany] = await Promise.all([getProfile(), getCompanyInfo()]);
     const whatsapp = profile?.whatsapp ? maskWhatsApp(profile.whatsapp) : "";
+    const displayUnit = profile?.defaultUnit ?? "mm";
+    const quoteWithLogo: Quote = {
+      ...quote,
+      companyInfo: {
+        ...quote.companyInfo,
+        logoUrl: quote.companyInfo.logoUrl || freshCompany.logoUrl,
+      },
+    };
+    const doc = await generateQuotePdf(quoteWithLogo, whatsapp, displayUnit);
+    return doc;
+  };
 
-    const displayUnit = profile?.defaultUnit ?? 'mm';
-    const doc = await generateQuotePdf(quote, whatsapp, displayUnit);
-    const fileName = `orcamento-${quote.clientName.replace(/\s+/g, "-").toLowerCase()}-${quote.id.slice(0, 8)}.pdf`;
+  const pdfFileName = `orcamento-${quote.clientName.replace(/\s+/g, "-").toLowerCase()}-${quote.id.slice(0, 8)}.pdf`;
 
+  const handleDownload = async () => {
+    setPdfOpen(false);
+    const doc = await buildPdfDoc();
     await onStatusChange(quote.id, "enviado");
+    doc.save(pdfFileName);
+    toast.success("PDF baixado!");
+  };
 
+  const handleShare = async () => {
+    setPdfOpen(false);
+    const doc = await buildPdfDoc();
+    await onStatusChange(quote.id, "enviado");
     if (navigator.share) {
       try {
         const blob = doc.output("blob");
-        const file = new File([blob], fileName, { type: "application/pdf" });
-        await navigator.share({ files: [file], title: `Orçamento — ${quote.clientName}` });
-        toast.success("PDF compartilhado! Status: Enviado.");
+        const file = new File([blob], pdfFileName, { type: "application/pdf" });
+        await navigator.share({ files: [file], title: `Orcamento — ${quote.clientName}` });
+        toast.success("PDF compartilhado!");
       } catch {
-        // Usuário cancelou ou erro — faz download como fallback
-        doc.save(fileName);
-        toast.success("PDF gerado! Status: Enviado.");
+        doc.save(pdfFileName);
+        toast.success("PDF baixado!");
       }
     } else {
-      doc.save(fileName);
-      toast.success("PDF baixado! Status: Enviado.");
+      doc.save(pdfFileName);
+      toast.success("PDF baixado!");
     }
   };
 
   const isSm = size === "sm";
-  const btnClass = isSm
-    ? "flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md"
-    : "flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg";
+  const btnBase = isSm
+    ? "flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md transition-colors"
+    : "flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition-colors";
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="flex items-center gap-1">
+      {/* Botão WA: ação direta, sem menu */}
       <button
-        onClick={() => setOpen((v) => !v)}
-        className={`${btnClass} bg-[hsl(215,80%,55%)]/10 text-[hsl(215,80%,45%)] hover:bg-[hsl(215,80%,55%)]/20 transition-colors`}
+        onClick={handleWhatsApp}
+        className={`${btnBase} bg-[hsl(215,80%,55%)]/10 text-[hsl(215,80%,45%)] hover:bg-[hsl(215,80%,55%)]/20`}
       >
-        <Send className={isSm ? "h-2.5 w-2.5" : "h-3 w-3"} /> Enviar WA
+        <Send className={isSm ? "h-2.5 w-2.5" : "h-3 w-3"} />
+        Enviar WA
       </button>
 
-      {open && (
-        <div className="absolute bottom-full left-0 mb-1 z-50 bg-card border border-border rounded-lg shadow-elevated min-w-[170px] py-1">
-          <button
-            onClick={handleText}
-            className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-medium text-foreground hover:bg-muted transition-colors text-left"
-          >
-            <MessageSquare className="h-3.5 w-3.5 flex-shrink-0 text-[hsl(215,80%,45%)]" />
-            Enviar texto formatado
-          </button>
-          <button
-            onClick={handlePdf}
-            className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-medium text-foreground hover:bg-muted transition-colors text-left"
-          >
-            <FileText className="h-3.5 w-3.5 flex-shrink-0 text-[hsl(145,60%,42%)]" />
-            Gerar e compartilhar PDF
-          </button>
-        </div>
-      )}
+      {/* Botão PDF: dropdown secundário */}
+      <div className="relative" ref={pdfRef}>
+        <button
+          onClick={() => setPdfOpen(v => !v)}
+          className={`${btnBase} bg-muted/60 text-muted-foreground hover:bg-muted`}
+        >
+          <FileText className={isSm ? "h-2.5 w-2.5" : "h-3 w-3"} />
+          PDF
+        </button>
+
+        {pdfOpen && (
+          <div className="absolute bottom-full left-0 mb-1 z-50 bg-card border border-border rounded-lg shadow-elevated min-w-[155px] py-1">
+            <button
+              onClick={handleDownload}
+              className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-medium text-foreground hover:bg-muted transition-colors text-left"
+            >
+              <Download className="h-3.5 w-3.5 flex-shrink-0 text-[hsl(145,60%,42%)]" />
+              Baixar PDF
+            </button>
+            <button
+              onClick={handleShare}
+              className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-medium text-foreground hover:bg-muted transition-colors text-left"
+            >
+              <Share2 className="h-3.5 w-3.5 flex-shrink-0 text-[hsl(215,80%,45%)]" />
+              Compartilhar PDF
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
