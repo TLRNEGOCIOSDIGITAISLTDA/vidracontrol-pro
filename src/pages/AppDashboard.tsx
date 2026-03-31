@@ -144,8 +144,17 @@ const AppDashboard = () => {
     ? (filteredQuotes.filter(q => (q.status || 'orcado') === 'aprovado').length / filteredQuotes.length) * 100
     : 0;
 
-  // Total Recebido / A Receber — sempre global (panorama financeiro completo)
-  const totalPending = Math.max(0, jobs.reduce((s, j) => s + j.saleValue, 0) - totalReceived);
+  // Total Recebido / A Receber — filtrados pelo período selecionado
+  const periodReceived = useMemo(() => {
+    let sum = 0;
+    paymentsByMonth.forEach((amount, key) => {
+      const [y, m] = key.split('-').map(Number);
+      const keyDate = new Date(y, m, 1);
+      if (keyDate >= periodStart && keyDate <= periodEnd) sum += amount;
+    });
+    return sum;
+  }, [paymentsByMonth, periodStart, periodEnd]);
+  const periodPending = Math.max(0, totalSales - periodReceived);
 
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -318,13 +327,13 @@ const AppDashboard = () => {
           <HighlightCard lastUpdate={lastUpdate}>
             <Wallet className="h-3.5 w-3.5 text-success mb-1" />
             <div className="text-[11px] text-muted-foreground">Total Recebido</div>
-            <div className="text-sm font-bold text-success leading-tight">{fmt(totalReceived)}</div>
+            <div className="text-sm font-bold text-success leading-tight">{fmt(periodReceived)}</div>
           </HighlightCard>
           <HighlightCard lastUpdate={lastUpdate}>
             <Clock className="h-3.5 w-3.5 text-[hsl(45,95%,40%)] mb-1" />
             <div className="text-[11px] text-muted-foreground">A Receber</div>
-            <div className={`text-sm font-bold leading-tight ${totalPending > 0 ? "text-[hsl(45,95%,40%)]" : "text-success"}`}>
-              {fmt(totalPending)}
+            <div className={`text-sm font-bold leading-tight ${periodPending > 0 ? "text-[hsl(45,95%,40%)]" : "text-success"}`}>
+              {fmt(periodPending)}
             </div>
           </HighlightCard>
           <HighlightCard lastUpdate={lastUpdate} className="col-span-2">
@@ -421,8 +430,7 @@ const AppDashboard = () => {
           </AnimatePresence>
         </div>
         <p className="text-[11px] text-muted-foreground -mt-2 text-center">
-          KPIs, Orçamentos e Obras filtrados por: <strong>{PERIOD_LABELS[period]}</strong>
-          {' '}· Recebido e A Receber são totais gerais
+          Todos os KPIs filtrados por: <strong>{PERIOD_LABELS[period]}</strong>
         </p>
 
         {/* Ver por Mês */}
