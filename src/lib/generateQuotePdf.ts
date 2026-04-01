@@ -70,6 +70,7 @@ const NAVY   = [30, 41, 59]    as [number, number, number];
 const ACCENT = [51, 102, 204]  as [number, number, number];
 const LIGHT  = [241, 245, 249] as [number, number, number];
 const WHITE  = [255, 255, 255] as [number, number, number];
+const GOLD   = [212, 175, 55]  as [number, number, number];
 
 export async function generateQuotePdf(quote: Quote, userWhatsapp?: string, displayUnit: 'cm' | 'mm' = 'mm'): Promise<jsPDF> {
   const doc = new jsPDF({ unit: 'mm', format: 'a4', putOnlyUsedFonts: true });
@@ -89,74 +90,83 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string, disp
   const PW = 210, ML = 14, MR = 14, CW = PW - ML - MR;
 
   // ══════════════════════════════════════════════════════════════
-  // CABEÇALHO — fundo navy, altura generosa
+  // CABEÇALHO — fundo navy
   // ══════════════════════════════════════════════════════════════
-  const HEADER_H = 50;
+  const HEADER_H = 58;
   doc.setFillColor(...NAVY);
   doc.rect(0, 0, PW, HEADER_H, 'F');
 
   let logoResult: ImageResult | null = null;
   if (co.logoUrl) logoResult = await loadImageBase64(co.logoUrl);
 
-  // Dimensões máximas da logo; respeitar proporção real da imagem
-  const MAX_LOGO_W = 36, MAX_LOGO_H = 30;
-  let logoW = MAX_LOGO_W, logoH = MAX_LOGO_H;
+  // Bloco branco da logo: tamanho fixo, logo centralizada (contain)
+  const BOX_W = 44, BOX_H = 40;
+  const BOX_X = ML;
+  const BOX_Y = (HEADER_H - BOX_H) / 2;   // 9mm do topo
+  const INNER_PAD = 4;                      // respiro interno
+  const INNER_W = BOX_W - INNER_PAD * 2;   // 36
+  const INNER_H = BOX_H - INNER_PAD * 2;   // 32
+
+  // Escalar logo para caber dentro do bloco mantendo proporção
+  let logoW = INNER_W, logoH = INNER_H;
   if (logoResult && logoResult.width > 0 && logoResult.height > 0) {
     const ratio = logoResult.width / logoResult.height;
-    if (ratio > MAX_LOGO_W / MAX_LOGO_H) {
-      logoW = MAX_LOGO_W;
-      logoH = MAX_LOGO_W / ratio;
+    if (ratio > INNER_W / INNER_H) {
+      logoW = INNER_W;
+      logoH = INNER_W / ratio;
     } else {
-      logoH = MAX_LOGO_H;
-      logoW = MAX_LOGO_H * ratio;
+      logoH = INNER_H;
+      logoW = INNER_H * ratio;
     }
   }
-  const LOGO_X = ML;
-  const LOGO_Y = (HEADER_H - logoH) / 2;
+  // Centralizar logo dentro do bloco
+  const logoDrawX = BOX_X + (BOX_W - logoW) / 2;
+  const logoDrawY = BOX_Y + (BOX_H - logoH) / 2;
 
   let textX = ML;
   let logoRendered = false;
   if (logoResult) {
     try {
       doc.setFillColor(...WHITE);
-      doc.roundedRect(LOGO_X - 1, LOGO_Y - 1, logoW + 2, logoH + 2, 2, 2, 'F');
-      doc.addImage(logoResult.dataUrl, logoResult.format, LOGO_X, LOGO_Y, logoW, logoH);
-      textX = LOGO_X + logoW + 7;
+      doc.roundedRect(BOX_X, BOX_Y, BOX_W, BOX_H, 3, 3, 'F');
+      doc.addImage(logoResult.dataUrl, logoResult.format, logoDrawX, logoDrawY, logoW, logoH);
+      textX = BOX_X + BOX_W + 9;
       logoRendered = true;
     } catch { textX = ML; }
   }
 
+  // Nome da empresa — apenas quando não há logo
   doc.setTextColor(...WHITE);
   if (co.name && !logoRendered) {
-    // Sem logo: nome grande no cabeçalho
-    doc.setFontSize(17);
+    doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text(t(co.name.toUpperCase()), textX, 17);
+    doc.text(t(co.name.toUpperCase()), textX, HEADER_H / 2 - 2);
   }
 
-  // Dados da empresa (endereço, telefone, e-mail)
-  doc.setFontSize(8.5);
+  // Informações da empresa — fonte reduzida, hierarquia secundária
+  doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(200, 220, 255);
-  // Com logo: começa mais alto pois não há título em texto ocupando espaço
-  let cy = logoRendered ? 19 : 24;
+  doc.setTextColor(185, 210, 255);
+  let cy = logoRendered ? BOX_Y + 9 : HEADER_H / 2 + 6;
   const hline = (txt: string) => {
     if (!txt.trim()) return;
     doc.text(t(txt), textX, cy);
-    cy += 4.8;
+    cy += 4.5;
   };
   if (co.address) hline(co.address);
   hline([co.cnpjCpf ? `CNPJ/CPF: ${co.cnpjCpf}` : '', co.phone ? `Tel: ${co.phone}` : ''].filter(Boolean).join('   |   '));
   hline([co.email, (co as any).website].filter(Boolean).join('   |   '));
 
-  // Número e data — canto direito do cabeçalho
+  // Número e data — verticalmente centrados no canto direito
+  const HDR_MID = HEADER_H / 2;
   doc.setTextColor(...WHITE);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
-  doc.text(t(`Orcamento No: ${quoteNum}`), PW - MR, 13, { align: 'right' });
+  doc.text(t(`Orcamento No: ${quoteNum}`), PW - MR, HDR_MID - 3, { align: 'right' });
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.text(`Data: ${date}`, PW - MR, 19, { align: 'right' });
+  doc.setFontSize(7.5);
+  doc.setTextColor(185, 210, 255);
+  doc.text(`Data: ${date}`, PW - MR, HDR_MID + 4, { align: 'right' });
 
   doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'normal');
@@ -164,7 +174,7 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string, disp
   // ══════════════════════════════════════════════════════════════
   // AVISO: empresa sem cadastro
   // ══════════════════════════════════════════════════════════════
-  let y = HEADER_H + 7;
+  let y = HEADER_H + 10;
   if (!hasCompanyData) {
     doc.setFillColor(255, 245, 200);
     doc.setDrawColor(220, 180, 0);
@@ -229,7 +239,7 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string, disp
     ry += 6;
   });
 
-  y += CLIENT_H + 6;
+  y += CLIENT_H + 8;
 
   // ══════════════════════════════════════════════════════════════
   // TABELA DE ITENS
@@ -238,7 +248,7 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string, disp
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...NAVY);
   doc.text('DESCRICAO DOS ITENS', ML, y);
-  y += 3;
+  y += 5;
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(0, 0, 0);
 
@@ -310,16 +320,26 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string, disp
   // ══════════════════════════════════════════════════════════════
   // TOTAL
   // ══════════════════════════════════════════════════════════════
+  // Linha dourada acima do bloco — acabamento premium
+  doc.setFillColor(...GOLD);
+  doc.rect(ML, y, CW, 1.5, 'F');
+  y += 1.5;
+
   doc.setFillColor(...NAVY);
-  doc.roundedRect(ML, y, CW, 12, 2, 2, 'F');
-  doc.setTextColor(...WHITE);
-  doc.setFontSize(12);
+  doc.roundedRect(ML, y, CW, 17, 2, 2, 'F');
+  // Label secundário — menor e mais discreto
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(185, 210, 255);
+  doc.text('VALOR TOTAL', ML + 7, y + 10);
+  // Valor — destaque principal
+  doc.setFontSize(15);
   doc.setFont('helvetica', 'bold');
-  doc.text('VALOR TOTAL:', ML + 5, y + 8);
-  doc.text(fmt(quote.total), PW - MR - 3, y + 8, { align: 'right' });
+  doc.setTextColor(...WHITE);
+  doc.text(fmt(quote.total), PW - MR - 4, y + 12, { align: 'right' });
   doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'normal');
-  y += 18;
+  y += 23;
 
   // ══════════════════════════════════════════════════════════════
   // CONDIÇÕES
