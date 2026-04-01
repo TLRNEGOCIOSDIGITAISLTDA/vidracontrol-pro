@@ -89,46 +89,51 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     // When moving to "aprovado", auto-create a Job — only if not already aprovado in DB
     if (newStatus === 'aprovado' && prevStatus !== 'aprovado') {
-      const jobItems: JobItem[] = quote.items.map(item => ({
-        id: crypto.randomUUID(),
-        type: item.type,
-        description: item.description,
-        width: item.width,
-        height: item.height,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        total: item.total,
-        area: item.width && item.height ? item.width * item.height / 1_000_000 * item.quantity : undefined,
-      }));
+      try {
+        const jobItems: JobItem[] = quote.items.map(item => ({
+          id: crypto.randomUUID(),
+          type: item.type,
+          description: item.description,
+          width: item.width,
+          height: item.height,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.total,
+          area: item.width && item.height ? item.width * item.height / 1_000_000 * item.quantity : undefined,
+        }));
 
-      const newJob = await storageAddJob({
-        clientName: quote.clientName,
-        description: `Orçamento aprovado — ${quote.jobType || 'Vidraçaria'}`,
-        saleValue: quote.total,
-        status: 'em_andamento',
-        items: jobItems,
-        quoteId: quoteId,
-      });
-
-      // Auto-create commission and NF expenses if defined on the quote
-      if (quote.commission && quote.commission > 0) {
-        await storageAddExpense(newJob.id, {
-          description: `Comissão ${quote.commission}%`,
-          category: 'comissao',
-          value: Math.round(quote.total * quote.commission) / 100,
-          photoUrl: undefined,
+        const newJob = await storageAddJob({
+          clientName: quote.clientName,
+          description: `Orçamento aprovado — ${quote.jobType || 'Vidraçaria'}`,
+          saleValue: quote.total,
+          status: 'em_andamento',
+          items: jobItems,
+          quoteId: quoteId,
         });
-      }
-      if (quote.nfPercent && quote.nfPercent > 0) {
-        await storageAddExpense(newJob.id, {
-          description: `Nota Fiscal ${quote.nfPercent}%`,
-          category: 'nf',
-          value: Math.round(quote.total * quote.nfPercent) / 100,
-          photoUrl: undefined,
-        });
-      }
 
-      await refreshJobs();
+        // Auto-create commission and NF expenses if defined on the quote
+        if (quote.commission && quote.commission > 0) {
+          await storageAddExpense(newJob.id, {
+            description: `Comissão ${quote.commission}%`,
+            category: 'comissao',
+            value: Math.round(quote.total * quote.commission) / 100,
+            photoUrl: undefined,
+          });
+        }
+        if (quote.nfPercent && quote.nfPercent > 0) {
+          await storageAddExpense(newJob.id, {
+            description: `Nota Fiscal ${quote.nfPercent}%`,
+            category: 'nf',
+            value: Math.round(quote.total * quote.nfPercent) / 100,
+            photoUrl: undefined,
+          });
+        }
+
+        await refreshJobs();
+      } catch (err) {
+        // Logar mas não abortar: status já foi salvo como 'aprovado'; refreshQuotes abaixo garante UI consistente
+        console.error('[changeQuoteStatus] falha ao criar obra:', err);
+      }
     }
 
     await refreshQuotes();

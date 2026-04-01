@@ -287,7 +287,8 @@ export async function addJob(job: Omit<Job, 'id' | 'createdAt' | 'expenses'> & {
     sale_value: job.saleValue,
     status: job.status,
     user_id: uid,
-    quote_id: job.quoteId || null,
+    // Inclui quote_id apenas quando existe — INSERT falha se a coluna não existir no banco
+    ...(job.quoteId ? { quote_id: job.quoteId } : {}),
   }).select().single();
 
   if (error || !row) throw new Error(error?.message || 'Failed to create job');
@@ -330,7 +331,7 @@ export async function updateJob(id: string, data: Partial<Job>): Promise<Job | n
   if (data.etapaPedirVidro !== undefined) update.etapa_pedir_vidro = data.etapaPedirVidro;
   if (data.etapaFabricacao !== undefined) update.etapa_fabricacao = data.etapaFabricacao;
   if (data.etapaInstalacao !== undefined) update.etapa_instalacao = data.etapaInstalacao;
-  if (data.quoteId !== undefined) update.quote_id = data.quoteId || null;
+  if (data.quoteId) update.quote_id = data.quoteId;
 
   await supabase.from('jobs').update(update).eq('id', id).eq('user_id', uid);
   await logAudit('update', 'job', id, update);
@@ -729,11 +730,14 @@ export async function updateQuote(quote: Quote): Promise<void> {
 
   // Sincroniza saleValue da obra vinculada, se existir
   // (a_receber e lucro são derivados de saleValue na UI, sem coluna extra no banco)
-  await supabase
-    .from('jobs')
-    .update({ sale_value: quote.total })
-    .eq('quote_id', quote.id)
-    .eq('user_id', uid);
+  // Try/catch: a coluna quote_id pode não existir em bancos sem a migration aplicada
+  try {
+    await supabase
+      .from('jobs')
+      .update({ sale_value: quote.total })
+      .eq('quote_id', quote.id)
+      .eq('user_id', uid);
+  } catch { /* quote_id column inexistente — silencia */ }
 }
 
 // ---- Job Notes ----
