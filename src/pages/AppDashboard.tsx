@@ -466,7 +466,7 @@ const AppDashboard = () => {
           </div>
         </div>
 
-        {/* ── Obras Em Aberto — sempre visíveis, independente do período ── */}
+        {/* ── Obras em Andamento — sempre visíveis, independente do período ── */}
         <div>
           {/* Cabeçalho: título + contador + toggle view + minimizar */}
           <div className="flex items-center gap-2 mb-3">
@@ -479,7 +479,7 @@ const AppDashboard = () => {
               }}
             >
               <Briefcase className="h-4 w-4 text-primary shrink-0" />
-              <h2 className="text-lg font-bold text-foreground leading-tight">Em Aberto</h2>
+              <h2 className="text-lg font-bold text-foreground leading-tight">Obras em Andamento</h2>
               <span className="text-sm text-muted-foreground shrink-0">({jobsEmAberto.length})</span>
               <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-300 shrink-0 ${andamentoOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -506,7 +506,7 @@ const AppDashboard = () => {
                 {jobsEmAberto.length === 0 ? (
                   <div className="bg-card rounded-xl p-6 text-center shadow-card">
                     <Briefcase className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">Nenhuma obra em aberto</p>
+                    <p className="text-sm text-muted-foreground">Nenhuma obra em andamento</p>
                   </div>
                 ) : andamentoView === "kanban" ? (
                   /* ── Kanban: colunas Em Andamento | Aguard. Pagamento ── */
