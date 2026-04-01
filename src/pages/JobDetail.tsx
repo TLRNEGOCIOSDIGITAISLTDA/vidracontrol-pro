@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Plus, Trash2, Camera, PieChart, Upload, Loader2, Wallet, Pencil, Package, FileEdit } from "lucide-react";
+import { Plus, Trash2, Camera, PieChart, Upload, Loader2, Wallet, Pencil, Package, FileEdit, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,7 +54,7 @@ const ALL_JOB_STATUSES: JobStatus[] = ['em_andamento', 'aguardando_pagamento', '
 const JobDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { removeJob } = useData();
+  const { removeJob, quotes, refreshJobs } = useData();
 
   const [job, setJob] = useState<Job | null>(null);
   const [payments, setPayments] = useState<JobPayment[]>([]);
@@ -90,6 +90,11 @@ const JobDetail = () => {
   const [editPayDate, setEditPayDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [editPayMethod, setEditPayMethod] = useState<PaymentMethod>("Pix");
   const [editPayNotes, setEditPayNotes] = useState("");
+
+  // Vincular orçamento
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkingQuoteId, setLinkingQuoteId] = useState('');
+  const [linkSaving, setLinkSaving] = useState(false);
 
   // AI scan state
   const [scanning, setScanning] = useState(false);
@@ -309,6 +314,23 @@ const JobDetail = () => {
     }
   };
 
+  const handleLinkQuote = async () => {
+    if (!linkingQuoteId) return;
+    setLinkSaving(true);
+    try {
+      await updateJob(job.id, { quoteId: linkingQuoteId });
+      setLinkDialogOpen(false);
+      setLinkingQuoteId('');
+      await reload();
+      await refreshJobs();
+      toast.success("Orçamento vinculado!");
+    } catch {
+      toast.error("Erro ao vincular orçamento.");
+    } finally {
+      setLinkSaving(false);
+    }
+  };
+
   const currentStatus = (job.status || 'em_andamento') as JobStatus;
 
   return (
@@ -346,9 +368,9 @@ const JobDetail = () => {
             </div>
           )}
 
-          {/* Botão "Editar Orçamento" — visível quando a obra tem orçamento vinculado */}
-          {job.quoteId && (
-            <div className="pt-1">
+          {/* Botão "Editar / Vincular Orçamento" */}
+          <div className="pt-1">
+            {job.quoteId ? (
               <Button
                 size="sm"
                 variant="outline"
@@ -358,8 +380,18 @@ const JobDetail = () => {
                 <FileEdit className="h-4 w-4" />
                 Editar Orçamento desta Obra
               </Button>
-            </div>
-          )}
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full gap-1.5 text-muted-foreground hover:text-foreground"
+                onClick={() => { setLinkingQuoteId(''); setLinkDialogOpen(true); }}
+              >
+                <Link2 className="h-4 w-4" />
+                Vincular Orçamento
+              </Button>
+            )}
+          </div>
 
           <div className="grid grid-cols-3 gap-3 pt-1">
             <div>
@@ -831,6 +863,51 @@ const JobDetail = () => {
               />
             </div>
             <Button onClick={handleAddPayment} className="w-full">Salvar Recebimento</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vincular Orçamento Dialog */}
+      <Dialog open={linkDialogOpen} onOpenChange={open => { setLinkDialogOpen(open); if (!open) setLinkingQuoteId(''); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Vincular Orçamento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-1">
+            <p className="text-sm text-muted-foreground">
+              Selecione o orçamento que originou esta obra:
+            </p>
+            <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+              {quotes.length === 0 && (
+                <p className="text-sm text-center text-muted-foreground py-4">Nenhum orçamento encontrado.</p>
+              )}
+              {quotes.map(q => (
+                <button
+                  key={q.id}
+                  type="button"
+                  className={`w-full text-left rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+                    linkingQuoteId === q.id
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border hover:bg-muted'
+                  }`}
+                  onClick={() => setLinkingQuoteId(q.id)}
+                >
+                  <div className="font-medium">{q.clientName}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {q.jobType && <span>{q.jobType} · </span>}
+                    {q.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    {' · '}{new Date(q.createdAt).toLocaleDateString('pt-BR')}
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button className="flex-1" disabled={!linkingQuoteId || linkSaving} onClick={handleLinkQuote}>
+                {linkSaving && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                Vincular
+              </Button>
+              <Button variant="outline" onClick={() => setLinkDialogOpen(false)}>Cancelar</Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
