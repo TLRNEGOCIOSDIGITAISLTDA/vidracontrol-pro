@@ -136,12 +136,21 @@ const AppDashboard = () => {
       return d >= periodStart && d <= periodEnd;
     }), [quotes, periodStart, periodEnd]);
 
-  // ── Obras Em Andamento — sempre visíveis independente do período ──
-  const jobsEmAndamento = useMemo(() =>
+  // ── Obras em aberto — sempre visíveis, independente do período ──
+  // Inclui em_andamento e aguardando_pagamento (obras abertas que precisam de atenção)
+  const OPEN_JOB_STATUSES: JobStatus[] = ['em_andamento', 'aguardando_pagamento'];
+  const jobsEmAberto = useMemo(() =>
     jobs
-      .filter(j => (j.status as JobStatus) === 'em_andamento')
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-    [jobs]
+      .filter(j => OPEN_JOB_STATUSES.includes(j.status as JobStatus))
+      .sort((a, b) => {
+        // Em Andamento primeiro, depois Aguardando Pagamento; dentro de cada grupo: mais recente primeiro
+        const order: Partial<Record<JobStatus, number>> = { em_andamento: 0, aguardando_pagamento: 1 };
+        const oa = order[a.status as JobStatus] ?? 99;
+        const ob = order[b.status as JobStatus] ?? 99;
+        if (oa !== ob) return oa - ob;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }),
+    [jobs] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // ── KPIs filtrados por período ───────────────────────────────
@@ -153,7 +162,10 @@ const AppDashboard = () => {
     ? (filteredQuotes.filter(q => (q.status || 'orcado') === 'aprovado').length / filteredQuotes.length) * 100
     : 0;
 
-  // ── Pagamentos por mês (deve ser declarado antes de periodReceived) ─
+  // ── Pagamentos brutos com timestamp exato ─────────────────────
+  // Armazena cada pagamento com seu created_at para filtragem precisa por período
+  const [paymentsRaw, setPaymentsRaw] = useState<{ amount: number; createdAt: Date }[]>([]);
+  // Também mantém agrupamento por mês para o bloco "Ver por Mês"
   const [paymentsByMonth, setPaymentsByMonth] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
@@ -164,26 +176,26 @@ const AppDashboard = () => {
         .from('job_payments')
         .select('amount, created_at')
         .eq('user_id', user.id);
+      const raw: { amount: number; createdAt: Date }[] = [];
       const map = new Map<string, number>();
       (data || []).forEach((r: any) => {
         const d = new Date(r.created_at);
+        raw.push({ amount: Number(r.amount), createdAt: d });
         const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
         map.set(key, (map.get(key) || 0) + Number(r.amount));
       });
+      setPaymentsRaw(raw);
       setPaymentsByMonth(map);
     })();
   }, [lastUpdate]);
 
-  // Total Recebido / A Receber — filtrados pelo período selecionado
-  const periodReceived = useMemo(() => {
-    let sum = 0;
-    paymentsByMonth.forEach((amount, key) => {
-      const [y, m] = key.split('-').map(Number);
-      const keyDate = new Date(y, m, 1);
-      if (keyDate >= periodStart && keyDate <= periodEnd) sum += amount;
-    });
-    return sum;
-  }, [paymentsByMonth, periodStart, periodEnd]);
+  // Total Recebido / A Receber — filtrados pelo período via timestamp exato
+  const periodReceived = useMemo(() =>
+    paymentsRaw
+      .filter(p => p.createdAt >= periodStart && p.createdAt <= periodEnd)
+      .reduce((s, p) => s + p.amount, 0),
+    [paymentsRaw, periodStart, periodEnd]
+  );
   const periodPending = Math.max(0, totalSales - periodReceived);
 
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -218,6 +230,13 @@ const AppDashboard = () => {
   );
   const [jobsView, setJobsView] = useState<"kanban" | "list">(
     () => (localStorage.getItem("dashJobsView") as "kanban" | "list") || "list"
+  );
+  // Seção "Em Aberto": toggle kanban/lista e minimizar/expandir (persistidos)
+  const [andamentoView, setAndamentoView] = useState<"kanban" | "list">(
+    () => (localStorage.getItem("dashAndamentoView") as "kanban" | "list") || "list"
+  );
+  const [andamentoOpen, setAndamentoOpen] = useState<boolean>(
+    () => localStorage.getItem("dashAndamentoOpen") !== "false"
   );
 
   const togglePieChart = () => {
@@ -447,62 +466,142 @@ const AppDashboard = () => {
           </div>
         </div>
 
-        {/* ── Obras Em Andamento — sempre visíveis, independente do período ── */}
+        {/* ── Obras Em Aberto — sempre visíveis, independente do período ── */}
         <div>
-          <div className="flex items-center justify-between mb-3 gap-2">
-            <div className="flex items-center gap-2 min-w-0">
+          {/* Cabeçalho: título + contador + toggle view + minimizar */}
+          <div className="flex items-center gap-2 mb-3">
+            <button
+              className="flex items-center gap-2 min-w-0 flex-1 text-left"
+              onClick={() => {
+                const next = !andamentoOpen;
+                setAndamentoOpen(next);
+                localStorage.setItem("dashAndamentoOpen", String(next));
+              }}
+            >
               <Briefcase className="h-4 w-4 text-primary shrink-0" />
-              <h2 className="text-lg font-bold text-foreground leading-tight">Em Andamento</h2>
-              <span className="text-sm text-muted-foreground shrink-0">({jobsEmAndamento.length})</span>
-            </div>
+              <h2 className="text-lg font-bold text-foreground leading-tight">Em Aberto</h2>
+              <span className="text-sm text-muted-foreground shrink-0">({jobsEmAberto.length})</span>
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-300 shrink-0 ${andamentoOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {andamentoOpen && (
+              <ViewToggle
+                view={andamentoView}
+                onChange={(v) => { setAndamentoView(v); localStorage.setItem("dashAndamentoView", v); }}
+              />
+            )}
             <Link to="/app/nova-obra" className="shrink-0">
               <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Nova</Button>
             </Link>
           </div>
 
-          {jobsEmAndamento.length === 0 ? (
-            <div className="bg-card rounded-xl p-6 text-center shadow-card">
-              <Briefcase className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">Nenhuma obra em andamento</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {jobsEmAndamento.map((job) => {
-                const expenses = job.expenses.reduce((s, e) => s + e.value, 0);
-                const profit = job.saleValue - expenses;
-                const received = job.totalReceived ?? 0;
-                const pending = Math.max(0, job.saleValue - received);
-                return (
-                  <Link key={job.id} to={`/app/obra/${job.id}`}>
-                    <div className="bg-card rounded-xl p-3 shadow-card hover:shadow-elevated transition-shadow border-l-4 border-l-primary/40">
-                      <div className="flex items-start justify-between gap-2 mb-1.5">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-foreground text-sm leading-tight truncate">{job.clientName}</h3>
-                          {job.description && <p className="text-[11px] text-muted-foreground truncate">{job.description}</p>}
-                        </div>
-                        <span className="text-sm font-bold text-foreground shrink-0">{fmt(job.saleValue)}</span>
-                      </div>
-                      <JobStepDots status={job.status} etapaMedicao={job.etapaMedicao} etapaPedirVidro={job.etapaPedirVidro} etapaFabricacao={job.etapaFabricacao} etapaInstalacao={job.etapaInstalacao} />
-                      <div className="grid grid-cols-3 gap-x-3 mt-2 text-[10px]">
-                        <div>
-                          <span className="text-muted-foreground">Recebido</span>
-                          <div className="font-bold text-success">{fmt(received)}</div>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">A Receber</span>
-                          <div className={`font-bold ${pending > 0 ? "text-[hsl(45,95%,40%)]" : "text-success"}`}>{fmt(pending)}</div>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Lucro</span>
-                          <div className={`font-bold ${profit >= 0 ? "text-success" : "text-destructive"}`}>{fmt(profit)}</div>
-                        </div>
-                      </div>
+          <AnimatePresence>
+            {andamentoOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="overflow-hidden"
+              >
+                {jobsEmAberto.length === 0 ? (
+                  <div className="bg-card rounded-xl p-6 text-center shadow-card">
+                    <Briefcase className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">Nenhuma obra em aberto</p>
+                  </div>
+                ) : andamentoView === "kanban" ? (
+                  /* ── Kanban: colunas Em Andamento | Aguard. Pagamento ── */
+                  <div className="overflow-x-auto pb-4 -mx-4 px-4">
+                    <div className="flex gap-3" style={{ minWidth: "max-content" }}>
+                      {OPEN_JOB_STATUSES.map(status => {
+                        const colJobs = jobsEmAberto.filter(j => (j.status as JobStatus) === status);
+                        const colTotal = colJobs.reduce((s, j) => s + j.saleValue, 0);
+                        return (
+                          <div key={status} className="flex flex-col w-[220px] flex-shrink-0">
+                            <div className="flex items-center gap-1.5 mb-2 px-1">
+                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: JOB_STATUS_HEX[status] }} />
+                              <p className="text-xs font-bold text-foreground leading-tight flex-1 min-w-0 truncate">
+                                {JOB_STATUS_LABELS[status]} ({colJobs.length}){colJobs.length > 0 ? ` — ${fmt(colTotal)}` : ""}
+                              </p>
+                            </div>
+                            <div className="rounded-xl p-2 space-y-2 min-h-[100px] bg-muted/40">
+                              {colJobs.map(job => {
+                                const expenses = job.expenses.reduce((s, e) => s + e.value, 0);
+                                const profit = job.saleValue - expenses;
+                                const received = job.totalReceived ?? 0;
+                                const pending = Math.max(0, job.saleValue - received);
+                                return (
+                                  <Link key={job.id} to={`/app/obra/${job.id}`}>
+                                    <div className="bg-card rounded-xl border border-border/50 shadow-card hover:shadow-elevated transition-shadow p-3 mb-2">
+                                      <h3 className="font-bold text-foreground text-sm leading-tight truncate">{job.clientName}</h3>
+                                      {job.description && <p className="text-[11px] text-muted-foreground truncate mb-1">{job.description}</p>}
+                                      <JobStepDots status={job.status} etapaMedicao={job.etapaMedicao} etapaPedirVidro={job.etapaPedirVidro} etapaFabricacao={job.etapaFabricacao} etapaInstalacao={job.etapaInstalacao} />
+                                      <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 mt-1.5 text-[9px]">
+                                        <div><span className="text-muted-foreground">Recebido</span><div className="font-bold text-success">{fmt(received)}</div></div>
+                                        <div><span className="text-muted-foreground">A Receber</span><div className={`font-bold ${pending > 0 ? "text-[hsl(45,95%,40%)]" : "text-success"}`}>{fmt(pending)}</div></div>
+                                        <div><span className="text-muted-foreground">Total</span><div className="font-bold text-foreground">{fmt(job.saleValue)}</div></div>
+                                        <div><span className="text-muted-foreground">Lucro</span><div className={`font-bold ${profit >= 0 ? "text-success" : "text-destructive"}`}>{fmt(profit)}</div></div>
+                                      </div>
+                                    </div>
+                                  </Link>
+                                );
+                              })}
+                              {colJobs.length === 0 && (
+                                <div className="flex items-center justify-center h-16 text-[11px] text-muted-foreground/40">Sem obras</div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
+                  </div>
+                ) : (
+                  /* ── Lista: Em Andamento primeiro, depois Aguard. Pagamento ── */
+                  <div className="space-y-4">
+                    {OPEN_JOB_STATUSES.map(status => {
+                      const group = jobsEmAberto.filter(j => (j.status as JobStatus) === status);
+                      if (group.length === 0) return null;
+                      return (
+                        <div key={status}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: JOB_STATUS_HEX[status] }} />
+                            <span className="text-sm font-bold text-foreground">{JOB_STATUS_LABELS[status]}</span>
+                            <span className="text-xs text-muted-foreground">({group.length})</span>
+                          </div>
+                          <div className="space-y-2">
+                            {group.map(job => {
+                              const expenses = job.expenses.reduce((s, e) => s + e.value, 0);
+                              const profit = job.saleValue - expenses;
+                              const received = job.totalReceived ?? 0;
+                              const pending = Math.max(0, job.saleValue - received);
+                              return (
+                                <Link key={job.id} to={`/app/obra/${job.id}`}>
+                                  <div className="bg-card rounded-xl p-3 shadow-card hover:shadow-elevated transition-shadow border-l-4 border-l-primary/40">
+                                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                                      <div className="flex-1 min-w-0">
+                                        <h3 className="font-bold text-foreground text-sm leading-tight truncate">{job.clientName}</h3>
+                                        {job.description && <p className="text-[11px] text-muted-foreground truncate">{job.description}</p>}
+                                      </div>
+                                      <span className="text-sm font-bold text-foreground shrink-0">{fmt(job.saleValue)}</span>
+                                    </div>
+                                    <JobStepDots status={job.status} etapaMedicao={job.etapaMedicao} etapaPedirVidro={job.etapaPedirVidro} etapaFabricacao={job.etapaFabricacao} etapaInstalacao={job.etapaInstalacao} />
+                                    <div className="grid grid-cols-3 gap-x-3 mt-2 text-[10px]">
+                                      <div><span className="text-muted-foreground">Recebido</span><div className="font-bold text-success">{fmt(received)}</div></div>
+                                      <div><span className="text-muted-foreground">A Receber</span><div className={`font-bold ${pending > 0 ? "text-[hsl(45,95%,40%)]" : "text-success"}`}>{fmt(pending)}</div></div>
+                                      <div><span className="text-muted-foreground">Lucro</span><div className={`font-bold ${profit >= 0 ? "text-success" : "text-destructive"}`}>{fmt(profit)}</div></div>
+                                    </div>
+                                  </div>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* ── Ver por Mês — histórico filtrado pelo período ── */}
