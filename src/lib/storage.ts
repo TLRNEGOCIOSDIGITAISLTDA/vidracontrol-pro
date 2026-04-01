@@ -281,17 +281,24 @@ export async function getJob(id: string): Promise<Job | undefined> {
 
 export async function addJob(job: Omit<Job, 'id' | 'createdAt' | 'expenses'> & { items?: JobItem[] }): Promise<Job> {
   const uid = await getUserId();
+
+  // INSERT sem quote_id: a coluna é opcional e pode não existir no banco (migration pendente)
   const { data: row, error } = await supabase.from('jobs').insert({
     client_name: job.clientName,
     description: job.description,
     sale_value: job.saleValue,
     status: job.status,
     user_id: uid,
-    // Inclui quote_id apenas quando existe — INSERT falha se a coluna não existir no banco
-    ...(job.quoteId ? { quote_id: job.quoteId } : {}),
   }).select().single();
 
   if (error || !row) throw new Error(error?.message || 'Failed to create job');
+
+  // Tenta vincular ao orçamento via UPDATE separado — falha silenciosamente se a coluna não existir
+  if (job.quoteId) {
+    try {
+      await supabase.from('jobs').update({ quote_id: job.quoteId }).eq('id', row.id).eq('user_id', uid);
+    } catch { /* quote_id column may not exist yet */ }
+  }
 
   if (job.items && job.items.length > 0) {
     await supabase.from('job_items').insert(
@@ -331,10 +338,19 @@ export async function updateJob(id: string, data: Partial<Job>): Promise<Job | n
   if (data.etapaPedirVidro !== undefined) update.etapa_pedir_vidro = data.etapaPedirVidro;
   if (data.etapaFabricacao !== undefined) update.etapa_fabricacao = data.etapaFabricacao;
   if (data.etapaInstalacao !== undefined) update.etapa_instalacao = data.etapaInstalacao;
-  if (data.quoteId) update.quote_id = data.quoteId;
 
-  await supabase.from('jobs').update(update).eq('id', id).eq('user_id', uid);
-  await logAudit('update', 'job', id, update);
+  if (Object.keys(update).length > 0) {
+    await supabase.from('jobs').update(update).eq('id', id).eq('user_id', uid);
+  }
+
+  // quote_id é tratado separadamente — coluna pode não existir no banco (migration pendente)
+  if (data.quoteId) {
+    try {
+      await supabase.from('jobs').update({ quote_id: data.quoteId }).eq('id', id).eq('user_id', uid);
+    } catch { /* quote_id column may not exist yet */ }
+  }
+
+  await logAudit('update', 'job', id, { ...update, ...(data.quoteId ? { quoteId: data.quoteId } : {}) });
   return await getJob(id) || null;
 }
 
