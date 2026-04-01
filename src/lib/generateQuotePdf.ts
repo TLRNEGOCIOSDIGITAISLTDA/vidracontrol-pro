@@ -18,29 +18,49 @@ function t(str: string): string {
     .replace(/[^\x00-\xFF]/g, '?');          // demais chars fora Latin-1 → ?
 }
 
-type ImageResult = { dataUrl: string; width: number; height: number; format: 'PNG' | 'JPEG' | 'WEBP' };
+type ImageResult = { dataUrl: string; width: number; height: number; format: 'PNG' | 'JPEG' };
 
+// Carrega a imagem da URL e converte para PNG via canvas.
+// Isso garante compatibilidade total com jsPDF (que não suporta WEBP/GIF/BMP).
+// Usar data URL local como src do Image evita contaminação CORS no canvas.
 async function loadImageBase64(url: string): Promise<ImageResult | null> {
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
     const blob = await res.blob();
-    const dataUrl = await new Promise<string>((resolve, reject) => {
+
+    // Passo 1: blob → data URL local (sem CORS)
+    const rawDataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = () => reject(new Error('FileReader error'));
       reader.readAsDataURL(blob);
     });
-    const dims = await new Promise<{ width: number; height: number }>((resolve) => {
+
+    // Passo 2: data URL local → canvas → PNG (converte WEBP, GIF, BMP etc.)
+    return await new Promise<ImageResult | null>((resolve) => {
       const img = new Image();
-      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-      img.onerror = () => resolve({ width: 0, height: 0 });
-      img.src = dataUrl;
+      img.onload = () => {
+        const w = img.naturalWidth || 300;
+        const h = img.naturalHeight || 300;
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('no ctx');
+          ctx.drawImage(img, 0, 0);
+          const pngDataUrl = canvas.toDataURL('image/png');
+          resolve({ dataUrl: pngDataUrl, format: 'PNG', width: w, height: h });
+        } catch {
+          // Canvas falhou: tenta usar data URL direta com formato detectado
+          const format = rawDataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+          resolve({ dataUrl: rawDataUrl, format, width: w, height: h });
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = rawDataUrl; // data URL local, sem risco de taint CORS
     });
-    const format: 'PNG' | 'JPEG' | 'WEBP' =
-      dataUrl.startsWith('data:image/png') ? 'PNG' :
-      dataUrl.startsWith('data:image/webp') ? 'WEBP' : 'JPEG';
-    return { dataUrl, format, ...dims };
   } catch {
     return null;
   }
@@ -95,28 +115,31 @@ export async function generateQuotePdf(quote: Quote, userWhatsapp?: string, disp
   const LOGO_Y = (HEADER_H - logoH) / 2;
 
   let textX = ML;
+  let logoRendered = false;
   if (logoResult) {
     try {
       doc.setFillColor(...WHITE);
       doc.roundedRect(LOGO_X - 1, LOGO_Y - 1, logoW + 2, logoH + 2, 2, 2, 'F');
       doc.addImage(logoResult.dataUrl, logoResult.format, LOGO_X, LOGO_Y, logoW, logoH);
       textX = LOGO_X + logoW + 7;
+      logoRendered = true;
     } catch { textX = ML; }
   }
 
-  // Nome da empresa
   doc.setTextColor(...WHITE);
-  if (co.name) {
+  if (co.name && !logoRendered) {
+    // Sem logo: nome grande no cabeçalho
     doc.setFontSize(17);
     doc.setFont('helvetica', 'bold');
     doc.text(t(co.name.toUpperCase()), textX, 17);
   }
 
-  // Dados da empresa
+  // Dados da empresa (endereço, telefone, e-mail)
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(200, 220, 255);
-  let cy = 24;
+  // Com logo: começa mais alto pois não há título em texto ocupando espaço
+  let cy = logoRendered ? 19 : 24;
   const hline = (txt: string) => {
     if (!txt.trim()) return;
     doc.text(t(txt), textX, cy);
