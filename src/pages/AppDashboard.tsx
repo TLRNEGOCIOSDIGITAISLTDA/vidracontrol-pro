@@ -136,6 +136,14 @@ const AppDashboard = () => {
       return d >= periodStart && d <= periodEnd;
     }), [quotes, periodStart, periodEnd]);
 
+  // ── Obras Em Andamento — sempre visíveis independente do período ──
+  const jobsEmAndamento = useMemo(() =>
+    jobs
+      .filter(j => (j.status as JobStatus) === 'em_andamento')
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [jobs]
+  );
+
   // ── KPIs filtrados por período ───────────────────────────────
   const totalSales = filteredJobs.reduce((s, j) => s + j.saleValue, 0);
   const totalCosts = filteredJobs.reduce((s, j) => s + j.expenses.reduce((es, e) => es + e.value, 0), 0);
@@ -285,15 +293,15 @@ const AppDashboard = () => {
     escolher_mes: monthKeyToLabel(selectedMonth),
   };
 
-  // Filtra monthlyData para o período atual (tudo para 'ano', só o mês para outros)
+  // Filtra monthlyData para o período atual — consistente com periodStart/periodEnd
   const visibleMonthlyData = useMemo(() => {
-    if (period === 'ano') return monthlyData;
     return monthlyData.filter(m => {
-      const entry = new Date(periodStart.getFullYear(), periodStart.getMonth(), 1);
       const [ey, em] = m.key.split('-').map(Number);
-      return ey === entry.getFullYear() && em === entry.getMonth();
+      const monthStart = new Date(ey, em, 1);
+      const monthEnd = new Date(ey, em + 1, 0, 23, 59, 59);
+      return monthStart <= periodEnd && monthEnd >= periodStart;
     });
-  }, [monthlyData, period, periodStart]);
+  }, [monthlyData, periodStart, periodEnd]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -301,71 +309,7 @@ const AppDashboard = () => {
 
       <div className="container px-4 py-6 space-y-6">
 
-        {/* KPI cards — grade 2 colunas */}
-        <div className="grid grid-cols-2 gap-2">
-          <HighlightCard lastUpdate={lastUpdate}>
-            <DollarSign className="h-3.5 w-3.5 text-muted-foreground mb-1" />
-            <div className="text-[11px] text-muted-foreground">Vendas</div>
-            <div className="text-sm font-bold text-foreground leading-tight">{fmt(totalSales)}</div>
-          </HighlightCard>
-          <HighlightCard lastUpdate={lastUpdate}>
-            <TrendingDown className="h-3.5 w-3.5 text-secondary mb-1" />
-            <div className="text-[11px] text-muted-foreground">Custos</div>
-            <div className="text-sm font-bold text-secondary leading-tight">{fmt(totalCosts)}</div>
-          </HighlightCard>
-          <HighlightCard lastUpdate={lastUpdate}>
-            <TrendingUp className="h-3.5 w-3.5 text-success mb-1" />
-            <div className="text-[11px] text-muted-foreground">Lucro</div>
-            <div className={`text-sm font-bold leading-tight ${totalProfit >= 0 ? "text-success" : "text-destructive"}`}>
-              {fmt(totalProfit)}
-            </div>
-          </HighlightCard>
-          <HighlightCard lastUpdate={lastUpdate}>
-            <Percent className="h-3.5 w-3.5 text-primary mb-1" />
-            <div className="text-[11px] text-muted-foreground">Margem Média</div>
-            <div className="text-sm font-bold text-primary leading-tight">{avgMargin.toFixed(1)}%</div>
-          </HighlightCard>
-          <HighlightCard lastUpdate={lastUpdate}>
-            <Wallet className="h-3.5 w-3.5 text-success mb-1" />
-            <div className="text-[11px] text-muted-foreground">Total Recebido</div>
-            <div className="text-sm font-bold text-success leading-tight">{fmt(periodReceived)}</div>
-          </HighlightCard>
-          <HighlightCard lastUpdate={lastUpdate}>
-            <Clock className="h-3.5 w-3.5 text-[hsl(45,95%,40%)] mb-1" />
-            <div className="text-[11px] text-muted-foreground">A Receber</div>
-            <div className={`text-sm font-bold leading-tight ${periodPending > 0 ? "text-[hsl(45,95%,40%)]" : "text-success"}`}>
-              {fmt(periodPending)}
-            </div>
-          </HighlightCard>
-          <HighlightCard lastUpdate={lastUpdate} className="col-span-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Target className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-[11px] text-muted-foreground">Taxa de Conversão</span>
-                </div>
-                <div className="text-xl font-bold text-primary leading-tight">{conversionRate.toFixed(1)}%</div>
-                <div className="text-[10px] text-muted-foreground mt-0.5">
-                  {filteredQuotes.filter(q => (q.status || 'orcado') === 'aprovado').length} aprovado(s) / {filteredQuotes.length} orçamento(s)
-                </div>
-              </div>
-              <div className="w-16 h-16 relative flex items-center justify-center">
-                <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="hsl(var(--muted))" strokeWidth="3" />
-                  <circle
-                    cx="18" cy="18" r="15.9" fill="none"
-                    stroke="hsl(var(--primary))" strokeWidth="3"
-                    strokeDasharray={`${conversionRate} ${100 - conversionRate}`}
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <span className="absolute text-[10px] font-bold text-primary">{conversionRate.toFixed(0)}%</span>
-              </div>
-            </div>
-          </HighlightCard>
-        </div>
-
-        {/* Seletor de período */}
+        {/* ── Filtro de período — controla tudo abaixo ── */}
         <div className="space-y-2">
           <div className="flex items-center gap-1 bg-muted rounded-xl p-1">
             {(['mes', 'mes_passado', 'ano'] as Period[]).map(p => (
@@ -430,12 +374,139 @@ const AppDashboard = () => {
             )}
           </AnimatePresence>
         </div>
-        <p className="text-[11px] text-muted-foreground -mt-2 text-center">
-          Todos os KPIs filtrados por: <strong>{PERIOD_LABELS[period]}</strong>
-        </p>
 
-        {/* Ver por Mês */}
-        {jobs.length > 0 && (
+        {/* ── KPIs — em destaque: Vendas, Lucro, Recebido, A Receber ── */}
+        <div>
+          <p className="text-[11px] text-muted-foreground mb-2 text-center">
+            KPIs de <strong>{PERIOD_LABELS[period]}</strong>
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {/* Destaque principal */}
+            <HighlightCard lastUpdate={lastUpdate}>
+              <DollarSign className="h-3.5 w-3.5 text-muted-foreground mb-1" />
+              <div className="text-[11px] text-muted-foreground">Vendas</div>
+              <div className="text-sm font-bold text-foreground leading-tight">{fmt(totalSales)}</div>
+            </HighlightCard>
+            <HighlightCard lastUpdate={lastUpdate}>
+              <TrendingUp className="h-3.5 w-3.5 text-success mb-1" />
+              <div className="text-[11px] text-muted-foreground">Lucro</div>
+              <div className={`text-sm font-bold leading-tight ${totalProfit >= 0 ? "text-success" : "text-destructive"}`}>
+                {fmt(totalProfit)}
+              </div>
+            </HighlightCard>
+            <HighlightCard lastUpdate={lastUpdate}>
+              <Wallet className="h-3.5 w-3.5 text-success mb-1" />
+              <div className="text-[11px] text-muted-foreground">Recebido</div>
+              <div className="text-sm font-bold text-success leading-tight">{fmt(periodReceived)}</div>
+            </HighlightCard>
+            <HighlightCard lastUpdate={lastUpdate}>
+              <Clock className="h-3.5 w-3.5 text-[hsl(45,95%,40%)] mb-1" />
+              <div className="text-[11px] text-muted-foreground">A Receber</div>
+              <div className={`text-sm font-bold leading-tight ${periodPending > 0 ? "text-[hsl(45,95%,40%)]" : "text-success"}`}>
+                {fmt(periodPending)}
+              </div>
+            </HighlightCard>
+
+            {/* KPIs secundários */}
+            <HighlightCard lastUpdate={lastUpdate}>
+              <TrendingDown className="h-3.5 w-3.5 text-secondary mb-1" />
+              <div className="text-[11px] text-muted-foreground">Custos</div>
+              <div className="text-sm font-bold text-secondary leading-tight">{fmt(totalCosts)}</div>
+            </HighlightCard>
+            <HighlightCard lastUpdate={lastUpdate}>
+              <Percent className="h-3.5 w-3.5 text-primary mb-1" />
+              <div className="text-[11px] text-muted-foreground">Margem Média</div>
+              <div className="text-sm font-bold text-primary leading-tight">{avgMargin.toFixed(1)}%</div>
+            </HighlightCard>
+            <HighlightCard lastUpdate={lastUpdate} className="col-span-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Target className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-[11px] text-muted-foreground">Taxa de Conversão</span>
+                  </div>
+                  <div className="text-xl font-bold text-primary leading-tight">{conversionRate.toFixed(1)}%</div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">
+                    {filteredQuotes.filter(q => (q.status || 'orcado') === 'aprovado').length} aprovado(s) / {filteredQuotes.length} orçamento(s)
+                  </div>
+                </div>
+                <div className="w-16 h-16 relative flex items-center justify-center">
+                  <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="hsl(var(--muted))" strokeWidth="3" />
+                    <circle
+                      cx="18" cy="18" r="15.9" fill="none"
+                      stroke="hsl(var(--primary))" strokeWidth="3"
+                      strokeDasharray={`${conversionRate} ${100 - conversionRate}`}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <span className="absolute text-[10px] font-bold text-primary">{conversionRate.toFixed(0)}%</span>
+                </div>
+              </div>
+            </HighlightCard>
+          </div>
+        </div>
+
+        {/* ── Obras Em Andamento — sempre visíveis, independente do período ── */}
+        <div>
+          <div className="flex items-center justify-between mb-3 gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Briefcase className="h-4 w-4 text-primary shrink-0" />
+              <h2 className="text-lg font-bold text-foreground leading-tight">Em Andamento</h2>
+              <span className="text-sm text-muted-foreground shrink-0">({jobsEmAndamento.length})</span>
+            </div>
+            <Link to="/app/nova-obra" className="shrink-0">
+              <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Nova</Button>
+            </Link>
+          </div>
+
+          {jobsEmAndamento.length === 0 ? (
+            <div className="bg-card rounded-xl p-6 text-center shadow-card">
+              <Briefcase className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">Nenhuma obra em andamento</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {jobsEmAndamento.map((job) => {
+                const expenses = job.expenses.reduce((s, e) => s + e.value, 0);
+                const profit = job.saleValue - expenses;
+                const received = job.totalReceived ?? 0;
+                const pending = Math.max(0, job.saleValue - received);
+                return (
+                  <Link key={job.id} to={`/app/obra/${job.id}`}>
+                    <div className="bg-card rounded-xl p-3 shadow-card hover:shadow-elevated transition-shadow border-l-4 border-l-primary/40">
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-foreground text-sm leading-tight truncate">{job.clientName}</h3>
+                          {job.description && <p className="text-[11px] text-muted-foreground truncate">{job.description}</p>}
+                        </div>
+                        <span className="text-sm font-bold text-foreground shrink-0">{fmt(job.saleValue)}</span>
+                      </div>
+                      <JobStepDots status={job.status} etapaMedicao={job.etapaMedicao} etapaPedirVidro={job.etapaPedirVidro} etapaFabricacao={job.etapaFabricacao} etapaInstalacao={job.etapaInstalacao} />
+                      <div className="grid grid-cols-3 gap-x-3 mt-2 text-[10px]">
+                        <div>
+                          <span className="text-muted-foreground">Recebido</span>
+                          <div className="font-bold text-success">{fmt(received)}</div>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">A Receber</span>
+                          <div className={`font-bold ${pending > 0 ? "text-[hsl(45,95%,40%)]" : "text-success"}`}>{fmt(pending)}</div>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Lucro</span>
+                          <div className={`font-bold ${profit >= 0 ? "text-success" : "text-destructive"}`}>{fmt(profit)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── Ver por Mês — histórico filtrado pelo período ── */}
+        {(jobs.length > 0 || quotes.length > 0) && (
           <div>
             <Button
               variant="outline"
@@ -457,6 +528,11 @@ const AppDashboard = () => {
                   className="overflow-hidden"
                 >
                   <div className="mt-4 space-y-4">
+                    {visibleMonthlyData.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Nenhum dado no período selecionado.
+                      </p>
+                    )}
                     {visibleMonthlyData.length > 1 && (
                       <div className="bg-card rounded-xl p-4 shadow-card">
                         <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-3">Evolução do Lucro</h3>
@@ -530,7 +606,7 @@ const AppDashboard = () => {
                               </div>
                             </div>
 
-                            {/* Accordion de orçamentos do mês por status */}
+                            {/* Accordion de orçamentos e obras do mês */}
                             <AnimatePresence>
                               {expandedMonth === m.key && (
                                 <motion.div
@@ -641,7 +717,7 @@ const AppDashboard = () => {
           </div>
         )}
 
-        {/* Gráficos de pizza — com toggle mostrar/ocultar */}
+        {/* ── Gráficos de pizza — orçamentos do período ── */}
         {hasQuotes && (
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -716,10 +792,13 @@ const AppDashboard = () => {
           </div>
         )}
 
-        {/* Seção Orçamentos */}
+        {/* ── Orçamentos do período ── */}
         <div>
           <div className="flex items-center justify-between mb-2 gap-2">
-            <h2 className="text-lg font-bold text-foreground min-w-0 truncate">Orçamentos</h2>
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold text-foreground leading-tight">Orçamentos</h2>
+              <p className="text-[11px] text-muted-foreground">{PERIOD_LABELS[period]} · {filteredQuotes.length} registro(s)</p>
+            </div>
             <Link to="/app/novo-orcamento" className="shrink-0">
               <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo</Button>
             </Link>
@@ -792,13 +871,13 @@ const AppDashboard = () => {
           </AnimatePresence>
         </div>
 
-        {/* Minhas Obras */}
+        {/* ── Obras do período (histórico filtrado) ── */}
         <div>
           <div className="flex items-center justify-between mb-2 gap-2">
-            <h2 className="text-lg font-bold text-foreground min-w-0 truncate">Minhas Obras</h2>
-            <Link to="/app/nova-obra" className="shrink-0">
-              <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Nova</Button>
-            </Link>
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold text-foreground leading-tight">Obras</h2>
+              <p className="text-[11px] text-muted-foreground">{PERIOD_LABELS[period]} · {filteredJobs.length} registro(s)</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <ViewToggle
@@ -806,7 +885,7 @@ const AppDashboard = () => {
               onChange={(v) => { setJobsView(v); localStorage.setItem("dashJobsView", v); }}
             />
             <Button size="sm" variant="outline" onClick={() => setJobsOpen(!jobsOpen)} className="gap-1 flex-1 min-w-0">
-              Ver todos
+              Ver todas
               <ChevronDown className={`h-4 w-4 transition-transform duration-300 shrink-0 ${jobsOpen ? "rotate-180" : ""}`} />
             </Button>
           </div>
@@ -905,28 +984,28 @@ const AppDashboard = () => {
                             </div>
                             <div className="space-y-2">
                               {groupJobs.map((job, i) => {
-                        const expenses = job.expenses.reduce((s, e) => s + e.value, 0);
-                        const profit = job.saleValue - expenses;
-                        return (
-                          <motion.div key={job.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
-                            <Link to={`/app/obra/${job.id}`}>
-                              <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow">
-                                <div className="flex items-center justify-between mb-2">
-                                  <h3 className="font-bold text-foreground truncate">{job.clientName}</h3>
-                                  <span className={`text-xs px-2 py-1 rounded-full font-medium shrink-0 ml-2 ${JOB_STATUS_COLORS[status]}`}>
-                                    {JOB_STATUS_LABELS[status]}
-                                  </span>
-                                </div>
-                                {job.description && <p className="text-sm text-muted-foreground truncate mb-1">{job.description}</p>}
-                                <JobStepDots status={job.status} etapaMedicao={job.etapaMedicao} etapaPedirVidro={job.etapaPedirVidro} etapaFabricacao={job.etapaFabricacao} etapaInstalacao={job.etapaInstalacao} />
-                                <div className="flex items-center gap-4 text-sm mt-2">
-                                  <span className="text-muted-foreground">Venda: <strong className="text-foreground">{fmt(job.saleValue)}</strong></span>
-                                  <span className="text-muted-foreground">Lucro: <strong className={profit >= 0 ? "text-success" : "text-destructive"}>{fmt(profit)}</strong></span>
-                                </div>
-                              </div>
-                            </Link>
-                          </motion.div>
-                        );
+                                const expenses = job.expenses.reduce((s, e) => s + e.value, 0);
+                                const profit = job.saleValue - expenses;
+                                return (
+                                  <motion.div key={job.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
+                                    <Link to={`/app/obra/${job.id}`}>
+                                      <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-elevated transition-shadow">
+                                        <div className="flex items-center justify-between mb-2">
+                                          <h3 className="font-bold text-foreground truncate">{job.clientName}</h3>
+                                          <span className={`text-xs px-2 py-1 rounded-full font-medium shrink-0 ml-2 ${JOB_STATUS_COLORS[status]}`}>
+                                            {JOB_STATUS_LABELS[status]}
+                                          </span>
+                                        </div>
+                                        {job.description && <p className="text-sm text-muted-foreground truncate mb-1">{job.description}</p>}
+                                        <JobStepDots status={job.status} etapaMedicao={job.etapaMedicao} etapaPedirVidro={job.etapaPedirVidro} etapaFabricacao={job.etapaFabricacao} etapaInstalacao={job.etapaInstalacao} />
+                                        <div className="flex items-center gap-4 text-sm mt-2">
+                                          <span className="text-muted-foreground">Venda: <strong className="text-foreground">{fmt(job.saleValue)}</strong></span>
+                                          <span className="text-muted-foreground">Lucro: <strong className={profit >= 0 ? "text-success" : "text-destructive"}>{fmt(profit)}</strong></span>
+                                        </div>
+                                      </div>
+                                    </Link>
+                                  </motion.div>
+                                );
                               })}
                             </div>
                           </div>
