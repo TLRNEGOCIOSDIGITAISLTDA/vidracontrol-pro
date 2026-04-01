@@ -353,7 +353,7 @@ const JobDetail = () => {
                 size="sm"
                 variant="outline"
                 className="w-full gap-1.5 text-muted-foreground hover:text-foreground"
-                onClick={() => navigate(`/app/orcamento/${job.quoteId}`)}
+                onClick={() => navigate(`/app/orcamento/${job.quoteId}`, { state: { fromJobId: job.id } })}
               >
                 <FileEdit className="h-4 w-4" />
                 Editar Orçamento desta Obra

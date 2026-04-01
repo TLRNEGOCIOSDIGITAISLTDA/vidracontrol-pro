@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { Trash2, Send, CheckCircle2, XCircle, Loader2, Circle, Pencil, Plus, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,8 @@ interface EditData {
 const QuoteDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromJobId: string | undefined = (location.state as any)?.fromJobId;
   const { changeQuoteStatus, removeQuote, updateQuote } = useData();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [sending, setSending] = useState(false);
@@ -262,7 +264,11 @@ const QuoteDetail = () => {
       await updateQuote(updated);
       setQuote(updated);
       toast.success("Orçamento atualizado!");
-      setEditing(false);
+      if (fromJobId) {
+        navigate(`/app/obra/${fromJobId}`);
+      } else {
+        setEditing(false);
+      }
     } catch {
       toast.error("Erro ao salvar orçamento.");
     } finally {
@@ -277,7 +283,7 @@ const QuoteDetail = () => {
 
   return (
     <div className="min-h-screen bg-muted">
-      <AppHeader title="Orçamento" backTo="/app/orcamentos" />
+      <AppHeader title="Orçamento" backTo={fromJobId ? `/app/obra/${fromJobId}` : "/app/orcamentos"} />
 
       <div className="container py-6 max-w-2xl space-y-4">
 
@@ -591,7 +597,10 @@ const QuoteDetail = () => {
                 {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                 Salvar Orçamento
               </Button>
-              <Button variant="outline" onClick={() => setEditing(false)}>Cancelar</Button>
+              <Button variant="outline" onClick={() => {
+                if (fromJobId) navigate(`/app/obra/${fromJobId}`);
+                else setEditing(false);
+              }}>Cancelar</Button>
             </div>
           </div>
         )}
