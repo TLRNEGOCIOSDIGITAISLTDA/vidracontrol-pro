@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Plus, Trash2, Camera, PieChart, Upload, Loader2, Wallet, Pencil, Package } from "lucide-react";
+import { Plus, Trash2, Camera, PieChart, Upload, Loader2, Wallet, Pencil, Package, FileEdit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -342,6 +342,21 @@ const JobDetail = () => {
               >
                 <Package className="h-4 w-4" />
                 Marcar como Entregue
+              </Button>
+            </div>
+          )}
+
+          {/* Botão "Editar Orçamento" — visível quando a obra tem orçamento vinculado */}
+          {job.quoteId && (
+            <div className="pt-1">
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full gap-1.5 text-muted-foreground hover:text-foreground"
+                onClick={() => navigate(`/app/orcamento/${job.quoteId}`)}
+              >
+                <FileEdit className="h-4 w-4" />
+                Editar Orçamento desta Obra
               </Button>
             </div>
           )}

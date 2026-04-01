@@ -250,6 +250,7 @@ export async function getJobs(): Promise<Job[]> {
     etapaPedirVidro: (r as any).etapa_pedir_vidro ?? false,
     etapaFabricacao: (r as any).etapa_fabricacao ?? false,
     etapaInstalacao: (r as any).etapa_instalacao ?? false,
+    quoteId: (r as any).quote_id || undefined,
     items: (items || []).filter(i => i.job_id === r.id).map(i => ({
       id: i.id,
       type: i.type as any,
@@ -286,6 +287,7 @@ export async function addJob(job: Omit<Job, 'id' | 'createdAt' | 'expenses'> & {
     sale_value: job.saleValue,
     status: job.status,
     user_id: uid,
+    quote_id: job.quoteId || null,
   }).select().single();
 
   if (error || !row) throw new Error(error?.message || 'Failed to create job');
@@ -328,6 +330,7 @@ export async function updateJob(id: string, data: Partial<Job>): Promise<Job | n
   if (data.etapaPedirVidro !== undefined) update.etapa_pedir_vidro = data.etapaPedirVidro;
   if (data.etapaFabricacao !== undefined) update.etapa_fabricacao = data.etapaFabricacao;
   if (data.etapaInstalacao !== undefined) update.etapa_instalacao = data.etapaInstalacao;
+  if (data.quoteId !== undefined) update.quote_id = data.quoteId || null;
 
   await supabase.from('jobs').update(update).eq('id', id).eq('user_id', uid);
   await logAudit('update', 'job', id, update);
@@ -723,6 +726,14 @@ export async function updateQuote(quote: Quote): Promise<void> {
     );
   }
   await logAudit('update', 'quote', quote.id, { clientName: quote.clientName });
+
+  // Sincroniza saleValue da obra vinculada, se existir
+  // (a_receber e lucro são derivados de saleValue na UI, sem coluna extra no banco)
+  await supabase
+    .from('jobs')
+    .update({ sale_value: quote.total })
+    .eq('quote_id', quote.id)
+    .eq('user_id', uid);
 }
 
 // ---- Job Notes ----

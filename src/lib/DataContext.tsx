@@ -107,6 +107,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         saleValue: quote.total,
         status: 'em_andamento',
         items: jobItems,
+        quoteId: quoteId,
       });
 
       // Auto-create commission and NF expenses if defined on the quote
@@ -135,8 +136,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const updateQuote = useCallback(async (quote: Quote) => {
     await storageUpdateQuote(quote);
-    await refreshQuotes();
-  }, [refreshQuotes]);
+    // Refresh tanto orçamentos quanto obras: updateQuote sincroniza saleValue da obra vinculada
+    await Promise.all([refreshQuotes(), refreshJobs()]);
+  }, [refreshQuotes, refreshJobs]);
 
   const removeJob = useCallback(async (jobId: string) => {
     await storageDeleteJob(jobId);

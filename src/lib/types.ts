@@ -88,6 +88,8 @@ export interface Job {
   etapaPedirVidro?: boolean;
   etapaFabricacao?: boolean;
   etapaInstalacao?: boolean;
+  /** ID do orçamento que originou esta obra (se houver) */
+  quoteId?: string;
 }
 
 export interface JobNote {
