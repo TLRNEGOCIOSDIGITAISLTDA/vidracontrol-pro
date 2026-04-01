@@ -186,6 +186,7 @@ export type Database = {
           created_at: string
           description: string
           id: string
+          quote_id: string | null
           sale_value: number
           status: string
           user_id: string | null
@@ -195,6 +196,7 @@ export type Database = {
           created_at?: string
           description?: string
           id?: string
+          quote_id?: string | null
           sale_value?: number
           status?: string
           user_id?: string | null
@@ -204,11 +206,20 @@ export type Database = {
           created_at?: string
           description?: string
           id?: string
+          quote_id?: string | null
           sale_value?: number
           status?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "jobs_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       profiles: {
         Row: {

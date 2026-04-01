@@ -282,23 +282,35 @@ export async function getJob(id: string): Promise<Job | undefined> {
 export async function addJob(job: Omit<Job, 'id' | 'createdAt' | 'expenses'> & { items?: JobItem[] }): Promise<Job> {
   const uid = await getUserId();
 
-  // INSERT sem quote_id: a coluna é opcional e pode não existir no banco (migration pendente)
-  const { data: row, error } = await supabase.from('jobs').insert({
+  // Tenta INSERT com quote_id incluído (requer migration 20260331000001_add_quote_id_to_jobs).
+  // Se a coluna não existir ainda, retenta sem quote_id para garantir criação da obra.
+  let row: any = null;
+  let insertError: any = null;
+
+  const insertPayload: Record<string, unknown> = {
     client_name: job.clientName,
     description: job.description,
     sale_value: job.saleValue,
     status: job.status,
     user_id: uid,
-  }).select().single();
+    ...(job.quoteId ? { quote_id: job.quoteId } : {}),
+  };
 
-  if (error || !row) throw new Error(error?.message || 'Failed to create job');
+  ({ data: row, error: insertError } = await supabase.from('jobs').insert(insertPayload as any).select().single());
 
-  // Tenta vincular ao orçamento via UPDATE separado — falha silenciosamente se a coluna não existir
-  if (job.quoteId) {
-    try {
-      await supabase.from('jobs').update({ quote_id: job.quoteId }).eq('id', row.id).eq('user_id', uid);
-    } catch { /* quote_id column may not exist yet */ }
+  // Se falhou por causa da coluna ausente, tenta novamente sem quote_id
+  if ((insertError || !row) && job.quoteId) {
+    const fallbackPayload = { ...insertPayload };
+    delete fallbackPayload.quote_id;
+    ({ data: row, error: insertError } = await (supabase.from('jobs') as any).insert(fallbackPayload).select().single());
+
+    // Tenta vínculo via UPDATE separado (falha silenciosamente se coluna não existir)
+    if (!insertError && row) {
+      await (supabase.from('jobs') as any).update({ quote_id: job.quoteId }).eq('id', row.id).eq('user_id', uid);
+    }
   }
+
+  if (insertError || !row) throw new Error(insertError?.message || 'Failed to create job');
 
   if (job.items && job.items.length > 0) {
     await supabase.from('job_items').insert(
@@ -807,6 +819,89 @@ export async function uploadJobPhoto(file: File): Promise<string | null> {
     return data.publicUrl;
   } catch {
     return null;
+  }
+}
+
+// ---- Backfill: cria obras para orçamentos aprovados sem obra vinculada ----
+
+/**
+ * Para cada orçamento com status "aprovado" que não tem obra vinculada (via quote_id),
+ * cria automaticamente uma obra. Idempotente: não duplica obras existentes.
+ * Retorna o número de obras criadas.
+ */
+export async function backfillJobsForApprovedQuotes(): Promise<number> {
+  try {
+    const uid = await getUserId();
+
+    // Busca todos os orçamentos aprovados
+    const allQuotes = await getQuotes();
+    const approved = allQuotes.filter(q => q.status === 'aprovado');
+    if (!approved.length) return 0;
+
+    // Busca todas as obras e monta conjunto de quote_ids já vinculados
+    const allJobs = await getJobs();
+    const linkedIds = new Set(allJobs.map(j => j.quoteId).filter(Boolean) as string[]);
+
+    let created = 0;
+
+    for (const quote of approved) {
+      if (linkedIds.has(quote.id)) continue; // já tem obra vinculada
+
+      try {
+        const jobItems: JobItem[] = (quote.items || []).map(item => ({
+          id: crypto.randomUUID(),
+          type: item.type,
+          description: item.description,
+          width: item.width,
+          height: item.height,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.total,
+          area: item.width && item.height ? item.width * item.height / 1_000_000 * item.quantity : undefined,
+        }));
+
+        const newJob = await addJob({
+          clientName: quote.clientName,
+          description: `Orçamento aprovado — ${quote.jobType || 'Vidraçaria'}`,
+          saleValue: quote.total,
+          status: 'em_andamento',
+          items: jobItems,
+          quoteId: quote.id,
+        });
+
+        if (quote.commission && quote.commission > 0) {
+          await addExpense(newJob.id, {
+            description: `Comissão ${quote.commission}%`,
+            category: 'comissao',
+            value: Math.round(quote.total * quote.commission) / 100,
+            photoUrl: undefined,
+          });
+        }
+        if (quote.nfPercent && quote.nfPercent > 0) {
+          await addExpense(newJob.id, {
+            description: `Nota Fiscal ${quote.nfPercent}%`,
+            category: 'nf',
+            value: Math.round(quote.total * quote.nfPercent) / 100,
+            photoUrl: undefined,
+          });
+        }
+
+        // Marca como vinculado para não duplicar nesta mesma execução
+        linkedIds.add(quote.id);
+        created++;
+      } catch (err) {
+        console.error('[backfill] falha ao criar obra para orçamento', quote.id, err);
+      }
+    }
+
+    if (created > 0) {
+      await logAudit('backfill', 'jobs', uid, { created });
+    }
+
+    return created;
+  } catch (err) {
+    console.error('[backfillJobsForApprovedQuotes]', err);
+    return 0;
   }
 }
 

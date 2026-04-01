@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from "react";
 import { Job, Quote, QuoteStatus, JobItem } from "./types";
 import {
   getJobs,
@@ -12,8 +12,10 @@ import {
   deleteQuote as storageDeleteQuote,
   saveQuoteStatus,
   updateQuote as storageUpdateQuote,
+  backfillJobsForApprovedQuotes,
 } from "./storage";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface DataContextType {
   jobs: Job[];
@@ -40,6 +42,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [totalReceived, setTotalReceived] = useState(0);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
+  const backfillRan = useRef(false);
 
   const bump = () => setLastUpdate(Date.now());
 
@@ -61,8 +64,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, [refreshJobs, refreshQuotes]);
 
-  // Initial load
-  useEffect(() => { refreshAll(); }, [refreshAll]);
+  // Initial load + backfill único por sessão
+  useEffect(() => {
+    refreshAll().then(async () => {
+      if (backfillRan.current) return;
+      backfillRan.current = true;
+      try {
+        const created = await backfillJobsForApprovedQuotes();
+        if (created > 0) {
+          await refreshJobs();
+          toast.success(`${created} obra${created > 1 ? 's criadas' : ' criada'} para orçamentos aprovados.`);
+        }
+      } catch { /* backfill opcional, não bloqueia */ }
+    });
+  }, [refreshAll, refreshJobs]);
 
   const addCost = useCallback(async (quoteId: string, cost: Parameters<typeof storageSaveCost>[1]) => {
     const result = await storageSaveCost(quoteId, cost);
@@ -89,6 +104,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     // When moving to "aprovado", auto-create a Job — only if not already aprovado in DB
     if (newStatus === 'aprovado' && prevStatus !== 'aprovado') {
+      let jobCreated = false;
       try {
         const jobItems: JobItem[] = quote.items.map(item => ({
           id: crypto.randomUUID(),
@@ -129,10 +145,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
           });
         }
 
+        jobCreated = true;
         await refreshJobs();
       } catch (err) {
-        // Logar mas não abortar: status já foi salvo como 'aprovado'; refreshQuotes abaixo garante UI consistente
+        // Status já salvo como 'aprovado'; avisa o usuário da falha na criação da obra
         console.error('[changeQuoteStatus] falha ao criar obra:', err);
+        toast.error('Orçamento aprovado, mas houve erro ao criar a obra. Recarregue a página.');
+      }
+
+      if (!jobCreated) {
+        // Tenta backfill imediato para recuperar
+        try {
+          const created = await backfillJobsForApprovedQuotes();
+          if (created > 0) await refreshJobs();
+        } catch { /* silent */ }
       }
     }
 
