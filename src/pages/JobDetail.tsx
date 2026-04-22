@@ -466,7 +466,7 @@ const JobDetail = () => {
               activeTab === 'recebimentos' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            <Wallet className="h-3.5 w-3.5" /> Pgto
+            <Wallet className="h-3.5 w-3.5" /> Recebimento
           </button>
           <button
             onClick={() => setActiveTab('anotacoes')}
@@ -794,7 +794,7 @@ const JobDetail = () => {
                 <Input className="mt-1" type="date" value={editPayDate} onChange={e => setEditPayDate(e.target.value)} />
               </div>
               <div>
-                <Label>Forma de Pagamento</Label>
+                <Label>Forma de Recebimento</Label>
                 <Select value={editPayMethod} onValueChange={(v) => setEditPayMethod(v as PaymentMethod)}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -841,7 +841,7 @@ const JobDetail = () => {
                 <Input className="mt-1" type="date" value={payDate} onChange={e => setPayDate(e.target.value)} />
               </div>
               <div>
-                <Label>Forma de Pagamento</Label>
+                <Label>Forma de Recebimento</Label>
                 <Select value={payMethod} onValueChange={(v) => setPayMethod(v as PaymentMethod)}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>

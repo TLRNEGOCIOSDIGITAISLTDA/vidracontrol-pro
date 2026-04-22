@@ -50,7 +50,7 @@ export type JobStatus = 'em_andamento' | 'aguardando_pagamento' | 'finalizado';
 
 export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   em_andamento: 'Em Andamento',
-  aguardando_pagamento: 'Entregue / Aguard. Pgto',
+  aguardando_pagamento: 'Entregue / Aguard. Recebimento',
   finalizado: 'Finalizado',
 };
 
