@@ -3,7 +3,7 @@ import { LayoutDashboard, Briefcase, FileText, Package, User } from "lucide-reac
 
 const tabs = [
   { to: "/app", icon: LayoutDashboard, label: "Início" },
-  { to: "/app/nova-obra", icon: Briefcase, label: "Nova Obra" },
+  { to: "/app/obras", icon: Briefcase, label: "Obras" },
   { to: "/app/orcamentos", icon: FileText, label: "Orçamentos" },
   { to: "/app/produtos", icon: Package, label: "Produtos" },
   { to: "/app/perfil", icon: User, label: "Perfil" },

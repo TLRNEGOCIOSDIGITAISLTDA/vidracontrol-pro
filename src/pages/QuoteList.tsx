@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Plus, FileText, LayoutGrid, List, CheckCircle2, XCircle, Eye } from "lucide-react";
+import { Plus, FileText, LayoutGrid, List, CheckCircle2, XCircle, Eye, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { useData } from "@/lib/DataContext";
@@ -12,6 +12,9 @@ import { QuoteKanban } from "@/components/app/QuoteKanban";
 import { QuoteSendMenu } from "@/components/app/QuoteSendMenu";
 
 const ALL_STATUSES: QuoteStatus[] = ["orcado", "enviado", "aguardando", "aprovado", "entregue", "perdido"];
+const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+type Period = 'mes' | 'ano' | 'escolher_mes';
 
 // ===== MAIN =====
 const QuoteList = () => {
@@ -38,9 +41,70 @@ const QuoteList = () => {
     await changeQuoteStatus(id, newStatus);
   };
 
+  // ── Filtro de período ────────────────────────────────────────
+  const [period, setPeriod] = useState<Period>(
+    () => (localStorage.getItem("quoteListPeriod") as Period) || "mes"
+  );
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    const now = new Date();
+    return localStorage.getItem("quoteListSelectedMonth") || `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}`;
+  });
+
+  const changePeriod = (p: Period) => {
+    setPeriod(p);
+    localStorage.setItem("quoteListPeriod", p);
+  };
+
+  const { periodStart, periodEnd } = useMemo(() => {
+    const now = new Date();
+    if (period === 'mes') return {
+      periodStart: new Date(now.getFullYear(), now.getMonth(), 1),
+      periodEnd: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
+    };
+    if (period === 'escolher_mes') {
+      const [y, m] = selectedMonth.split('-').map(Number);
+      return {
+        periodStart: new Date(y, m, 1),
+        periodEnd: new Date(y, m + 1, 0, 23, 59, 59),
+      };
+    }
+    return {
+      periodStart: new Date(now.getFullYear(), 0, 1),
+      periodEnd: new Date(now.getFullYear(), 11, 31, 23, 59, 59),
+    };
+  }, [period, selectedMonth]);
+
+  const filteredQuotes = useMemo(() =>
+    quotes.filter(q => {
+      const d = new Date(q.createdAt);
+      return d >= periodStart && d <= periodEnd;
+    }),
+    [quotes, periodStart, periodEnd]
+  );
+
+  const availableMonths = useMemo(() => {
+    const keys = new Set<string>();
+    quotes.forEach(q => {
+      const d = new Date(q.createdAt);
+      keys.add(`${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`);
+    });
+    return Array.from(keys).sort();
+  }, [quotes]);
+
+  const monthKeyToLabel = (key: string) => {
+    const [y, m] = key.split('-').map(Number);
+    return `${MONTH_NAMES[m]} ${y}`;
+  };
+
+  const PERIOD_LABELS: Record<Period, string> = {
+    mes: 'Este Mês',
+    ano: 'Ano Todo',
+    escolher_mes: monthKeyToLabel(selectedMonth),
+  };
+
   // Lista completa para a view de lista
   const quotesByStatus = ALL_STATUSES.map((status) => {
-    const filtered = quotes.filter((q) => (q.status || "orcado") === status);
+    const filtered = filteredQuotes.filter((q) => (q.status || "orcado") === status);
     return {
       status,
       label: QUOTE_STATUS_LABELS[status],
@@ -55,7 +119,7 @@ const QuoteList = () => {
   const chartByStatus = quotesByStatus.filter((d) => CHART_STATUSES.includes(d.status));
   const qtyData = chartByStatus.filter((d) => d.count > 0).map((d) => ({ name: d.label, value: d.count, color: d.color }));
   const valueData = chartByStatus.filter((d) => d.total > 0).map((d) => ({ name: d.label, value: d.total, color: d.color }));
-  const hasData = quotes.length > 0;
+  const hasData = filteredQuotes.length > 0;
   const renderLabel = ({ percent }: { percent: number }) =>
     percent > 0 ? `${(percent * 100).toFixed(0)}%` : "";
 
@@ -63,7 +127,7 @@ const QuoteList = () => {
     <div className="min-h-screen bg-background">
       <AppHeader title="Orçamentos" backTo="/app" />
 
-      <div className="container py-6 space-y-6">
+      <div className="container py-6 space-y-4">
         {/* Top bar */}
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-foreground">Meus Orçamentos</h2>
@@ -82,7 +146,8 @@ const QuoteList = () => {
                 <LayoutGrid className="h-4 w-4" />
               </button>
               <button
-                onClick={() => setViewAndStore("list")}
+                onClick={() => setViewAndStore("list")
+                }
                 title="Lista"
                 className={`p-1.5 rounded-md transition-colors ${
                   view === "list"
@@ -100,6 +165,59 @@ const QuoteList = () => {
             </Link>
           </div>
         </div>
+
+        {/* Filtro de período */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-1 bg-muted rounded-xl p-1">
+            {(['mes', 'ano'] as Period[]).map(p => (
+              <button
+                key={p}
+                onClick={() => changePeriod(p)}
+                className={`flex-1 text-xs font-medium py-1.5 px-1 rounded-lg transition-colors ${
+                  period === p ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {PERIOD_LABELS[p]}
+              </button>
+            ))}
+            <button
+              onClick={() => changePeriod('escolher_mes')}
+              className={`flex-1 text-xs font-medium py-1.5 px-1 rounded-lg transition-colors flex items-center justify-center gap-1 ${
+                period === 'escolher_mes' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <CalendarDays className="h-3 w-3 shrink-0" />
+              <span className="truncate">{period === 'escolher_mes' ? monthKeyToLabel(selectedMonth) : 'Mês'}</span>
+            </button>
+          </div>
+
+          {period === 'escolher_mes' && (
+            <div className="overflow-x-auto pb-1 -mx-1 px-1">
+              {availableMonths.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-2">Nenhum dado disponível</p>
+              ) : (
+                <div className="flex gap-1.5 w-max">
+                  {availableMonths.map(key => (
+                    <button
+                      key={key}
+                      onClick={() => { setSelectedMonth(key); localStorage.setItem("quoteListSelectedMonth", key); }}
+                      className={`text-xs py-1 px-2.5 rounded-full whitespace-nowrap transition-colors ${
+                        selectedMonth === key ? 'bg-primary text-primary-foreground font-semibold' : 'bg-muted text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {monthKeyToLabel(key)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Contador */}
+        <p className="text-[11px] text-muted-foreground">
+          {PERIOD_LABELS[period]} · {filteredQuotes.length} registro(s)
+        </p>
 
         {/* Charts — só na visualização lista */}
         {hasData && view === "list" && (
@@ -181,20 +299,20 @@ const QuoteList = () => {
         )}
 
         {/* Empty state */}
-        {quotes.length === 0 && (
+        {filteredQuotes.length === 0 && (
           <div className="text-center py-16">
             <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
-            <p className="text-muted-foreground">Nenhum orçamento ainda.</p>
+            <p className="text-muted-foreground">Nenhum orçamento no período.</p>
           </div>
         )}
 
         {/* ========== KANBAN VIEW ========== */}
-        {quotes.length > 0 && view === "kanban" && (
-          <QuoteKanban novoId={novoId} />
+        {filteredQuotes.length > 0 && view === "kanban" && (
+          <QuoteKanban quotes={filteredQuotes} novoId={novoId} />
         )}
 
         {/* ========== LIST VIEW ========== */}
-        {quotes.length > 0 && view === "list" && (
+        {filteredQuotes.length > 0 && view === "list" && (
           <div className="space-y-5">
             {quotesByStatus
               .filter((g) => g.count > 0)

@@ -23,6 +23,7 @@ import Profile from "./pages/Profile";
 import Products from "./pages/Products";
 import NotFound from "./pages/NotFound";
 import PublicQuoteView from "./pages/PublicQuoteView";
+import JobsList from "./pages/JobsList";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ const App = () => (
           <Route path="/esqueci-senha" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/app" element={<ProtectedRoute><AppDashboard /></ProtectedRoute>} />
+          <Route path="/app/obras" element={<ProtectedRoute><JobsList /></ProtectedRoute>} />
           <Route path="/app/nova-obra" element={<ProtectedRoute><NewJob /></ProtectedRoute>} />
           <Route path="/app/obra/:id" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
           <Route path="/app/orcamentos" element={<ProtectedRoute><QuoteList /></ProtectedRoute>} />
