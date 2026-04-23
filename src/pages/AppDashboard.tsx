@@ -23,7 +23,7 @@ const JOB_STATUS_HEX: Record<JobStatus, string> = {
 
 const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
-type Period = 'mes' | 'mes_passado' | 'ano' | 'escolher_mes';
+type Period = 'mes' | 'ano' | 'escolher_mes';
 
 const HighlightCard = ({ children, className = "", lastUpdate }: { children: React.ReactNode; className?: string; lastUpdate: number }) => {
   const [flash, setFlash] = useState(false);
@@ -104,13 +104,7 @@ const AppDashboard = () => {
         periodEnd: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
       };
     }
-    if (period === 'mes_passado') {
-      return {
-        periodStart: new Date(now.getFullYear(), now.getMonth() - 1, 1),
-        periodEnd: new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59),
-      };
-    }
-    if (period === 'escolher_mes') {
+if (period === 'escolher_mes') {
       const [y, m] = selectedMonth.split('-').map(Number);
       return {
         periodStart: new Date(y, m, 1),
@@ -294,7 +288,6 @@ const monthlyData = useMemo(() => {
 
   const PERIOD_LABELS: Record<Period, string> = {
     mes: 'Este Mês',
-    mes_passado: 'Mês Passado',
     ano: 'Ano Todo',
     escolher_mes: monthKeyToLabel(selectedMonth),
   };
@@ -318,7 +311,7 @@ const monthlyData = useMemo(() => {
         {/* ── Filtro de período — controla tudo abaixo ── */}
         <div className="space-y-2">
           <div className="flex items-center gap-1 bg-muted rounded-xl p-1">
-            {(['mes', 'mes_passado', 'ano'] as Period[]).map(p => (
+            {(['mes', 'ano'] as Period[]).map(p => (
               <button
                 key={p}
                 onClick={() => changePeriod(p)}
