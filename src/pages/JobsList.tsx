@@ -1,22 +1,21 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Briefcase, LayoutGrid, List, CalendarDays } from "lucide-react";
+import { Plus, Briefcase, LayoutGrid, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { useData } from "@/lib/DataContext";
 import { JobStatus, JOB_STATUS_LABELS, JOB_STATUS_COLORS } from "@/lib/types";
 import { motion } from "framer-motion";
 import { JobStepDots } from "@/components/app/JobStepDots";
+import { PeriodFilter, usePeriodFilter } from "@/components/app/PeriodFilter";
 
 const ALL_JOB_STATUSES: JobStatus[] = ['em_andamento', 'aguardando_pagamento', 'finalizado'];
+
 const JOB_STATUS_HEX: Record<JobStatus, string> = {
   em_andamento: 'hsl(215,80%,55%)',
   aguardando_pagamento: '#f59e0b',
   finalizado: '#22c55e',
 };
-const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-
-type Period = 'mes' | 'ano' | 'escolher_mes';
 
 const JobsList = () => {
   const { jobs } = useData();
@@ -25,53 +24,15 @@ const JobsList = () => {
 
   // ── View toggle ──────────────────────────────────────────────
   const [view, setView] = useState<"kanban" | "list">(
-    () => (localStorage.getItem("jobsListView") as "kanban" | "list") || "list"
+    () => (localStorage.getItem("jobsListView") as "kanban" | "list") || "list",
   );
   const setViewAndStore = (v: "kanban" | "list") => {
     setView(v);
     localStorage.setItem("jobsListView", v);
   };
 
-  // ── Filtro de período ────────────────────────────────────────
-  const [period, setPeriod] = useState<Period>(
-    () => (localStorage.getItem("jobsListPeriod") as Period) || "mes"
-  );
-  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
-    const now = new Date();
-    return localStorage.getItem("jobsListSelectedMonth") || `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}`;
-  });
-
-  const changePeriod = (p: Period) => {
-    setPeriod(p);
-    localStorage.setItem("jobsListPeriod", p);
-  };
-
-  const { periodStart, periodEnd } = useMemo(() => {
-    const now = new Date();
-    if (period === 'mes') return {
-      periodStart: new Date(now.getFullYear(), now.getMonth(), 1),
-      periodEnd: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
-    };
-    if (period === 'escolher_mes') {
-      const [y, m] = selectedMonth.split('-').map(Number);
-      return {
-        periodStart: new Date(y, m, 1),
-        periodEnd: new Date(y, m + 1, 0, 23, 59, 59),
-      };
-    }
-    return {
-      periodStart: new Date(now.getFullYear(), 0, 1),
-      periodEnd: new Date(now.getFullYear(), 11, 31, 23, 59, 59),
-    };
-  }, [period, selectedMonth]);
-
-  const filteredJobs = useMemo(() =>
-    jobs.filter(j => {
-      const d = new Date(j.createdAt);
-      return d >= periodStart && d <= periodEnd;
-    }),
-    [jobs, periodStart, periodEnd]
-  );
+  // ── Filtro de período (independente do Dashboard) ────────────
+  const periodFilter = usePeriodFilter("jobsList");
 
   const availableMonths = useMemo(() => {
     const keys = new Set<string>();
@@ -82,16 +43,13 @@ const JobsList = () => {
     return Array.from(keys).sort();
   }, [jobs]);
 
-  const monthKeyToLabel = (key: string) => {
-    const [y, m] = key.split('-').map(Number);
-    return `${MONTH_NAMES[m]} ${y}`;
-  };
-
-  const PERIOD_LABELS: Record<Period, string> = {
-    mes: 'Este Mês',
-    ano: 'Ano Todo',
-    escolher_mes: monthKeyToLabel(selectedMonth),
-  };
+  const filteredJobs = useMemo(() =>
+    jobs.filter(j => {
+      const d = new Date(j.createdAt);
+      return d >= periodFilter.periodStart && d <= periodFilter.periodEnd;
+    }),
+    [jobs, periodFilter.periodStart, periodFilter.periodEnd],
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -102,7 +60,6 @@ const JobsList = () => {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-foreground">Minhas Obras</h2>
           <div className="flex items-center gap-2">
-            {/* View toggle */}
             <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
               <button
                 onClick={() => setViewAndStore("kanban")}
@@ -120,64 +77,17 @@ const JobsList = () => {
               </button>
             </div>
             <Link to="/app/nova-obra">
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-1" /> Nova
-              </Button>
+              <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Nova</Button>
             </Link>
           </div>
         </div>
 
         {/* Filtro de período */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-1 bg-muted rounded-xl p-1">
-            {(['mes', 'ano'] as Period[]).map(p => (
-              <button
-                key={p}
-                onClick={() => changePeriod(p)}
-                className={`flex-1 text-xs font-medium py-1.5 px-1 rounded-lg transition-colors ${
-                  period === p ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {PERIOD_LABELS[p]}
-              </button>
-            ))}
-            <button
-              onClick={() => changePeriod('escolher_mes')}
-              className={`flex-1 text-xs font-medium py-1.5 px-1 rounded-lg transition-colors flex items-center justify-center gap-1 ${
-                period === 'escolher_mes' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <CalendarDays className="h-3 w-3 shrink-0" />
-              <span className="truncate">{period === 'escolher_mes' ? monthKeyToLabel(selectedMonth) : 'Mês'}</span>
-            </button>
-          </div>
-
-          {period === 'escolher_mes' && (
-            <div className="overflow-x-auto pb-1 -mx-1 px-1">
-              {availableMonths.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-2">Nenhum dado disponível</p>
-              ) : (
-                <div className="flex gap-1.5 w-max">
-                  {availableMonths.map(key => (
-                    <button
-                      key={key}
-                      onClick={() => { setSelectedMonth(key); localStorage.setItem("jobsListSelectedMonth", key); }}
-                      className={`text-xs py-1 px-2.5 rounded-full whitespace-nowrap transition-colors ${
-                        selectedMonth === key ? 'bg-primary text-primary-foreground font-semibold' : 'bg-muted text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      {monthKeyToLabel(key)}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <PeriodFilter state={periodFilter} availableMonths={availableMonths} />
 
         {/* Contador */}
         <p className="text-[11px] text-muted-foreground">
-          {PERIOD_LABELS[period]} · {filteredJobs.length} registro(s)
+          {periodFilter.periodLabel} · {filteredJobs.length} registro(s)
         </p>
 
         {/* Empty state */}
