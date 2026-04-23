@@ -80,20 +80,9 @@ const AppDashboard = () => {
     const now = new Date();
     return localStorage.getItem('dashSelectedMonth') || `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}`;
   });
-  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
-
   const changePeriod = (p: Period) => {
     setPeriod(p);
     localStorage.setItem('dashPeriod', p);
-    if (p !== 'escolher_mes') setMonthPickerOpen(false);
-  };
-
-  const changeSelectedMonth = (key: string) => {
-    setSelectedMonth(key);
-    localStorage.setItem('dashSelectedMonth', key);
-    setMonthPickerOpen(false);
-    setPeriod('escolher_mes');
-    localStorage.setItem('dashPeriod', 'escolher_mes');
   };
 
   const { periodStart, periodEnd } = useMemo(() => {
@@ -277,7 +266,7 @@ const monthlyData = useMemo(() => {
       const d = new Date(q.createdAt);
       keys.add(`${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`);
     });
-    return Array.from(keys).sort().reverse();
+    return Array.from(keys).sort();
   }, [jobs, quotes]);
 
   const monthKeyToLabel = (key: string) => {
@@ -325,7 +314,7 @@ const monthlyData = useMemo(() => {
               </button>
             ))}
             <button
-              onClick={() => { setMonthPickerOpen(v => !v); if (period !== 'escolher_mes') setPeriod('escolher_mes'); }}
+              onClick={() => changePeriod('escolher_mes')}
               className={`flex-1 text-xs font-medium py-1.5 px-1 rounded-lg transition-colors flex items-center justify-center gap-1 ${
                 period === 'escolher_mes'
                   ? 'bg-card shadow-sm text-foreground'
@@ -337,41 +326,30 @@ const monthlyData = useMemo(() => {
             </button>
           </div>
 
-          {/* Month picker dropdown */}
-          <AnimatePresence>
-            {monthPickerOpen && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="bg-card rounded-xl shadow-card p-3 border border-border/50">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-2">Selecionar mês</p>
-                  {availableMonths.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-2">Nenhum dado disponível</p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {availableMonths.map(key => (
-                        <button
-                          key={key}
-                          onClick={() => changeSelectedMonth(key)}
-                          className={`text-xs py-1.5 px-2 rounded-lg text-left transition-colors ${
-                            selectedMonth === key && period === 'escolher_mes'
-                              ? 'bg-primary text-primary-foreground font-semibold'
-                              : 'bg-muted hover:bg-muted/80 text-foreground'
-                          }`}
-                        >
-                          {monthKeyToLabel(key)}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+          {/* Month pills — visíveis enquanto período "escolher_mes" estiver ativo */}
+          {period === 'escolher_mes' && (
+            <div className="overflow-x-auto pb-1 -mx-1 px-1">
+              {availableMonths.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-2">Nenhum dado disponível</p>
+              ) : (
+                <div className="flex gap-1.5 w-max">
+                  {availableMonths.map(key => (
+                    <button
+                      key={key}
+                      onClick={() => { setSelectedMonth(key); localStorage.setItem('dashSelectedMonth', key); }}
+                      className={`text-xs py-1 px-2.5 rounded-full whitespace-nowrap transition-colors ${
+                        selectedMonth === key
+                          ? 'bg-primary text-primary-foreground font-semibold'
+                          : 'bg-muted text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {monthKeyToLabel(key)}
+                    </button>
+                  ))}
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── KPIs — em destaque: Vendas, Lucro, Recebido, A Receber ── */}
