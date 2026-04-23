@@ -1,17 +1,18 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronDown, Trash2, Percent, CalendarDays, LayoutGrid, List, Wallet, Clock, Target } from "lucide-react";
+import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronDown, Trash2, Percent, CalendarDays, LayoutGrid, List, Wallet, Clock, Target, X, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { useData } from "@/lib/DataContext";
-import { clearAllData } from "@/lib/storage";
-import { QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS, QUOTE_STATUS_BG, JOB_STATUS_LABELS, JOB_STATUS_COLORS, JobStatus } from "@/lib/types";
+import { clearAllData, addJobPayment } from "@/lib/storage";
+import { QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS, QUOTE_STATUS_BG, JOB_STATUS_LABELS, JOB_STATUS_COLORS, JobStatus, PaymentMethod, PAYMENT_METHODS } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { toast } from "sonner";
 import { QuoteKanban } from "@/components/app/QuoteKanban";
 import { JobStepDots } from "@/components/app/JobStepDots";
 import { supabase } from "@/integrations/supabase/client";
+import { CurrencyInput, parseCurrency } from "@/components/app/CurrencyInput";
 
 const ALL_STATUSES: QuoteStatus[] = ['orcado', 'enviado', 'aguardando', 'aprovado', 'entregue', 'perdido'];
 const ALL_JOB_STATUSES: JobStatus[] = ['em_andamento', 'aguardando_pagamento', 'finalizado'];
@@ -217,6 +218,44 @@ const [quotesView, setQuotesView] = useState<"kanban" | "list">(
     () => localStorage.getItem("dashAndamentoOpen") !== "false"
   );
 
+  // ── Modal "A Receber" ────────────────────────────────────────
+  const [pendingModalOpen, setPendingModalOpen] = useState(false);
+  // jobId → { amount display, method, saving }
+  const [inlineForm, setInlineForm] = useState<Record<string, { amount: string; method: PaymentMethod; saving: boolean } | undefined>>({});
+  // totalReceived por job atualizado localmente após salvar
+  const [localReceived, setLocalReceived] = useState<Record<string, number>>({});
+
+  const pendingJobs = useMemo(() => {
+    return filteredJobs
+      .map(j => {
+        const received = (localReceived[j.id] ?? j.totalReceived ?? 0);
+        const pending = Math.max(0, j.saleValue - received);
+        return { ...j, _received: received, _pending: pending };
+      })
+      .filter(j => j._pending > 0)
+      .sort((a, b) => b._pending - a._pending);
+  }, [filteredJobs, localReceived]);
+
+  const handleSaveInlinePayment = async (jobId: string, saleValue: number, currentReceived: number) => {
+    const form = inlineForm[jobId];
+    if (!form) return;
+    const val = parseCurrency(form.amount);
+    if (!val || val <= 0) { toast.error("Informe um valor válido."); return; }
+    setInlineForm(prev => ({ ...prev, [jobId]: { ...prev[jobId]!, saving: true } }));
+    const today = new Date().toISOString().split('T')[0];
+    const result = await addJobPayment(jobId, { amount: val, paymentDate: today, paymentMethod: form.method });
+    if (!result) { toast.error("Erro ao salvar recebimento."); setInlineForm(prev => ({ ...prev, [jobId]: { ...prev[jobId]!, saving: false } })); return; }
+    const newTotal = currentReceived + val;
+    setLocalReceived(prev => ({ ...prev, [jobId]: newTotal }));
+    setInlineForm(prev => { const n = { ...prev }; delete n[jobId]; return n; });
+    if (saleValue > 0 && newTotal >= saleValue) {
+      toast.success("Recebimento registrado! Obra quitada 🎉");
+    } else {
+      toast.success("Recebimento registrado!");
+    }
+    refreshAll();
+  };
+
 const monthlyData = useMemo(() => {
     const map = new Map<string, { key: string; month: string; sales: number; costs: number; count: number }>();
     const jobsByKey = new Map<string, typeof jobs>();
@@ -376,13 +415,16 @@ const monthlyData = useMemo(() => {
               <div className="text-[11px] text-muted-foreground">Recebido</div>
               <div className="text-sm font-bold text-success leading-tight">{fmt(periodReceived)}</div>
             </HighlightCard>
-            <HighlightCard lastUpdate={lastUpdate}>
+            <div
+              className="bg-card rounded-xl p-3 shadow-card transition-all duration-500 cursor-pointer hover:shadow-elevated hover:ring-1 hover:ring-border active:scale-[0.98]"
+              onClick={() => setPendingModalOpen(true)}
+            >
               <Clock className="h-3.5 w-3.5 text-[hsl(45,95%,40%)] mb-1" />
               <div className="text-[11px] text-muted-foreground">A Receber</div>
               <div className={`text-sm font-bold leading-tight ${periodPending > 0 ? "text-[hsl(45,95%,40%)]" : "text-success"}`}>
                 {fmt(periodPending)}
               </div>
-            </HighlightCard>
+            </div>
 
             {/* KPIs secundários */}
             <HighlightCard lastUpdate={lastUpdate}>
@@ -1019,6 +1061,122 @@ const monthlyData = useMemo(() => {
           </Button>
         </div>
       </div>
+
+      {/* ── Modal A Receber ── */}
+      <AnimatePresence>
+        {pendingModalOpen && (
+          <>
+            <motion.div
+              key="pending-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="fixed inset-0 bg-black/60 z-40"
+              onClick={() => setPendingModalOpen(false)}
+            />
+            <motion.div
+              key="pending-modal"
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 40 }}
+              transition={{ duration: 0.22 }}
+              className="fixed inset-x-4 top-[10%] bottom-[4%] z-50 flex flex-col bg-background rounded-2xl shadow-2xl overflow-hidden max-w-lg mx-auto"
+            >
+              {/* Cabeçalho */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+                <div>
+                  <h2 className="font-bold text-foreground text-base">A Receber</h2>
+                  <p className="text-[11px] text-muted-foreground">{PERIOD_LABELS[period]}</p>
+                </div>
+                <button onClick={() => setPendingModalOpen(false)} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </div>
+
+              {/* Lista */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {pendingJobs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                    <Clock className="h-10 w-10 text-muted-foreground/30 mb-3" />
+                    <p className="text-sm text-muted-foreground">Nenhum valor pendente neste período</p>
+                  </div>
+                ) : (
+                  pendingJobs.map(job => {
+                    const form = inlineForm[job.id];
+                    return (
+                      <div key={job.id} className="bg-card rounded-xl border border-border/50 shadow-card p-3">
+                        {/* Dados da obra */}
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="min-w-0">
+                            <p className="font-bold text-foreground text-sm truncate">{job.clientName}</p>
+                            {job.description && <p className="text-[11px] text-muted-foreground truncate">{job.description}</p>}
+                          </div>
+                          <Link to={`/app/obra/${job.id}`} className="shrink-0 p-1 rounded-lg hover:bg-muted transition-colors" onClick={() => setPendingModalOpen(false)}>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          </Link>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5 mb-2.5 text-[11px]">
+                          <div className="bg-muted rounded-lg px-2 py-1.5 text-center">
+                            <div className="text-muted-foreground mb-0.5">Total</div>
+                            <div className="font-bold text-foreground">{fmt(job.saleValue)}</div>
+                          </div>
+                          <div className="bg-muted rounded-lg px-2 py-1.5 text-center">
+                            <div className="text-muted-foreground mb-0.5">Recebido</div>
+                            <div className="font-bold text-success">{fmt(job._received)}</div>
+                          </div>
+                          <div className="bg-muted rounded-lg px-2 py-1.5 text-center">
+                            <div className="text-muted-foreground mb-0.5">A Receber</div>
+                            <div className="font-bold text-[hsl(45,95%,40%)]">{fmt(job._pending)}</div>
+                          </div>
+                        </div>
+
+                        {/* Formulário inline */}
+                        {form ? (
+                          <div className="space-y-2 pt-2 border-t border-border/40">
+                            <CurrencyInput
+                              value={form.amount}
+                              onChange={v => setInlineForm(prev => ({ ...prev, [job.id]: { ...prev[job.id]!, amount: v } }))}
+                              placeholder="Valor recebido"
+                              className="h-8 text-sm"
+                            />
+                            <div className="flex gap-1.5">
+                              {PAYMENT_METHODS.map(m => (
+                                <button
+                                  key={m}
+                                  onClick={() => setInlineForm(prev => ({ ...prev, [job.id]: { ...prev[job.id]!, method: m } }))}
+                                  className={`flex-1 text-xs py-1 rounded-lg transition-colors ${form.method === m ? 'bg-primary text-primary-foreground font-semibold' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
+                                >
+                                  {m}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" className="flex-1 h-8 text-xs" disabled={form.saving} onClick={() => handleSaveInlinePayment(job.id, job.saleValue, job._received)}>
+                                {form.saving ? 'Salvando…' : 'Salvar'}
+                              </Button>
+                              <Button size="sm" variant="ghost" className="h-8 text-xs px-3" onClick={() => setInlineForm(prev => { const n = { ...prev }; delete n[job.id]; return n; })}>
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setInlineForm(prev => ({ ...prev, [job.id]: { amount: '', method: 'Pix', saving: false } }))}
+                            className="w-full text-xs py-1.5 rounded-lg border border-dashed border-primary/40 text-primary hover:bg-primary/5 transition-colors font-medium"
+                          >
+                            + Recebimento
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
