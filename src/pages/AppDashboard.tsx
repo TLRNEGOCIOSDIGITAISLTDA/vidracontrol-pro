@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronDown, Trash2, Percent, CalendarDays, LayoutGrid, List, Wallet, Clock, PieChartIcon, Target } from "lucide-react";
+import { Plus, Briefcase, TrendingUp, TrendingDown, DollarSign, FileText, ChevronDown, Trash2, Percent, CalendarDays, LayoutGrid, List, Wallet, Clock, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { useData } from "@/lib/DataContext";
 import { clearAllData } from "@/lib/storage";
 import { QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS, QUOTE_STATUS_BG, JOB_STATUS_LABELS, JOB_STATUS_COLORS, JobStatus } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import { ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { toast } from "sonner";
 import { QuoteKanban } from "@/components/app/QuoteKanban";
 import { JobStepDots } from "@/components/app/JobStepDots";
@@ -213,19 +213,14 @@ const AppDashboard = () => {
     };
   });
 
-  const qtyData = quotesByStatus.filter(d => d.count > 0).map(d => ({ name: d.label, value: d.count, color: d.color }));
-  const valueData = quotesByStatus.filter(d => d.total > 0).map(d => ({ name: d.label, value: d.total, color: d.color }));
-  const hasQuotes = filteredQuotes.length > 0;
+const hasQuotes = filteredQuotes.length > 0;
 
   // ── Estado persistido ────────────────────────────────────────
   const [quotesOpen, setQuotesOpen] = useState(false);
   const [jobsOpen, setJobsOpen] = useState(false);
   const [monthlyOpen, setMonthlyOpen] = useState(false);
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
-  const [showPieChart, setShowPieChart] = useState(
-    () => localStorage.getItem("dashShowPie") !== "false"
-  );
-  const [quotesView, setQuotesView] = useState<"kanban" | "list">(
+const [quotesView, setQuotesView] = useState<"kanban" | "list">(
     () => (localStorage.getItem("dashQuotesView") as "kanban" | "list") || "kanban"
   );
   const [jobsView, setJobsView] = useState<"kanban" | "list">(
@@ -239,13 +234,7 @@ const AppDashboard = () => {
     () => localStorage.getItem("dashAndamentoOpen") !== "false"
   );
 
-  const togglePieChart = () => {
-    const next = !showPieChart;
-    setShowPieChart(next);
-    localStorage.setItem("dashShowPie", String(next));
-  };
-
-  const monthlyData = useMemo(() => {
+const monthlyData = useMemo(() => {
     const map = new Map<string, { key: string; month: string; sales: number; costs: number; count: number }>();
     const jobsByKey = new Map<string, typeof jobs>();
     const quotesByKey = new Map<string, typeof quotes>();
@@ -302,8 +291,6 @@ const AppDashboard = () => {
     return `${MONTH_NAMES[m]} ${y}`;
   };
 
-  const renderLabel = ({ percent }: { percent: number }) =>
-    percent > 0 ? `${(percent * 100).toFixed(0)}%` : "";
 
   const PERIOD_LABELS: Record<Period, string> = {
     mes: 'Este Mês',
@@ -808,81 +795,6 @@ const AppDashboard = () => {
                           </motion.div>
                         );
                       })}
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )}
-
-        {/* ── Gráficos de pizza — orçamentos do período ── */}
-        {hasQuotes && (
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-bold text-foreground">Orçamentos — Visão Geral</h2>
-              <button
-                onClick={togglePieChart}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted shrink-0"
-              >
-                <PieChartIcon className="h-3.5 w-3.5" />
-                {showPieChart ? "Ocultar" : "Mostrar gráfico"}
-              </button>
-            </div>
-            <AnimatePresence>
-              {showPieChart && (
-                <motion.div
-                  key="pie-chart"
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.25 }}
-                  className="overflow-hidden"
-                >
-                  <div className="bg-card rounded-xl shadow-card p-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <h4 className="text-[10px] font-bold text-muted-foreground text-center mb-1 uppercase tracking-wide">Quantidade</h4>
-                        <div className="h-32">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <Pie data={qtyData} cx="50%" cy="50%" outerRadius={45} dataKey="value" label={renderLabel} labelLine={false} stroke="none">
-                                {qtyData.map((entry, i) => (<Cell key={i} fill={entry.color} />))}
-                              </Pie>
-                              <Tooltip formatter={(v: number) => `${v} orçamento(s)`} />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </div>
-                        <div className="flex flex-wrap justify-center gap-2 mt-1">
-                          {quotesByStatus.map((d) => (
-                            <div key={d.status} className="flex items-center gap-1 text-[10px]">
-                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
-                              <span className="text-muted-foreground">{d.label} ({d.count})</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="text-[10px] font-bold text-muted-foreground text-center mb-1 uppercase tracking-wide">Valores (R$)</h4>
-                        <div className="h-32">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <Pie data={valueData} cx="50%" cy="50%" outerRadius={45} dataKey="value" label={renderLabel} labelLine={false} stroke="none">
-                                {valueData.map((entry, i) => (<Cell key={i} fill={entry.color} />))}
-                              </Pie>
-                              <Tooltip formatter={(v: number) => fmt(v)} />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </div>
-                        <div className="flex flex-wrap justify-center gap-2 mt-1">
-                          {quotesByStatus.map((d) => (
-                            <div key={d.status} className="flex items-center gap-1 text-[10px]">
-                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
-                              <span className="text-muted-foreground">{d.label} ({fmt(d.total)})</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </motion.div>
