@@ -1,13 +1,14 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Briefcase, LayoutGrid, List } from "lucide-react";
+import { Plus, Briefcase, LayoutGrid, List, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { useData } from "@/lib/DataContext";
 import { JobStatus, JOB_STATUS_LABELS, JOB_STATUS_COLORS } from "@/lib/types";
 import { motion } from "framer-motion";
 import { JobStepDots } from "@/components/app/JobStepDots";
-import { PeriodFilter, usePeriodFilter } from "@/components/app/PeriodFilter";
+
+// ─── Constantes (declaradas antes do componente) ─────────────
 
 const ALL_JOB_STATUSES: JobStatus[] = ['em_andamento', 'aguardando_pagamento', 'finalizado'];
 
@@ -16,6 +17,15 @@ const JOB_STATUS_HEX: Record<JobStatus, string> = {
   aguardando_pagamento: '#f59e0b',
   finalizado: '#22c55e',
 };
+
+const MONTH_NAMES = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+type FilterPeriod = "mes" | "ano" | "escolher_mes";
+
+// ─── Componente ──────────────────────────────────────────────
 
 const JobsList = () => {
   const { jobs } = useData();
@@ -31,24 +41,76 @@ const JobsList = () => {
     localStorage.setItem("jobsListView", v);
   };
 
-  // ── Filtro de período (independente do Dashboard) ────────────
-  const periodFilter = usePeriodFilter("jobsList");
+  // ── Filtro de período ────────────────────────────────────────
+  const [filterPeriod, setFilterPeriod] = useState<FilterPeriod>(
+    () => (localStorage.getItem("jobsFilter") as FilterPeriod) || "mes",
+  );
+  const [filterMonth, setFilterMonth] = useState<string>(() => {
+    const now = new Date();
+    return (
+      localStorage.getItem("jobsFilterMonth") ||
+      now.getFullYear() + "-" + String(now.getMonth()).padStart(2, "0")
+    );
+  });
 
+  const changeFilter = (p: FilterPeriod) => {
+    setFilterPeriod(p);
+    localStorage.setItem("jobsFilter", p);
+  };
+  const changeMonth = (key: string) => {
+    setFilterMonth(key);
+    localStorage.setItem("jobsFilterMonth", key);
+  };
+
+  // Calcular início e fim do período
+  const periodStart = useMemo(() => {
+    const now = new Date();
+    if (filterPeriod === "mes")
+      return new Date(now.getFullYear(), now.getMonth(), 1);
+    if (filterPeriod === "escolher_mes") {
+      const [y, m] = filterMonth.split("-").map(Number);
+      return new Date(y, m, 1);
+    }
+    return new Date(now.getFullYear(), 0, 1);
+  }, [filterPeriod, filterMonth]);
+
+  const periodEnd = useMemo(() => {
+    const now = new Date();
+    if (filterPeriod === "mes")
+      return new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    if (filterPeriod === "escolher_mes") {
+      const [y, m] = filterMonth.split("-").map(Number);
+      return new Date(y, m + 1, 0, 23, 59, 59);
+    }
+    return new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+  }, [filterPeriod, filterMonth]);
+
+  // Label do período atual
+  const periodLabel = useMemo(() => {
+    if (filterPeriod === "mes") return "Este Mês";
+    if (filterPeriod === "ano") return "Ano Todo";
+    const [y, m] = filterMonth.split("-").map(Number);
+    return MONTH_NAMES[m] + " " + y;
+  }, [filterPeriod, filterMonth]);
+
+  // Meses disponíveis (ordem cronológica)
   const availableMonths = useMemo(() => {
     const keys = new Set<string>();
-    jobs.forEach(j => {
+    jobs.forEach((j) => {
       const d = new Date(j.createdAt);
-      keys.add(`${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`);
+      keys.add(d.getFullYear() + "-" + String(d.getMonth()).padStart(2, "0"));
     });
     return Array.from(keys).sort();
   }, [jobs]);
 
-  const filteredJobs = useMemo(() =>
-    jobs.filter(j => {
-      const d = new Date(j.createdAt);
-      return d >= periodFilter.periodStart && d <= periodFilter.periodEnd;
-    }),
-    [jobs, periodFilter.periodStart, periodFilter.periodEnd],
+  // Obras filtradas pelo período
+  const filteredJobs = useMemo(
+    () =>
+      jobs.filter((j) => {
+        const d = new Date(j.createdAt);
+        return d >= periodStart && d <= periodEnd;
+      }),
+    [jobs, periodStart, periodEnd],
   );
 
   return (
@@ -83,11 +145,80 @@ const JobsList = () => {
         </div>
 
         {/* Filtro de período */}
-        <PeriodFilter state={periodFilter} availableMonths={availableMonths} />
+        <div className="space-y-2">
+          <div className="flex gap-1 bg-muted rounded-xl p-1">
+            <button
+              onClick={() => changeFilter("mes")}
+              className={`flex-1 text-xs font-medium py-1.5 px-1 rounded-lg transition-colors ${
+                filterPeriod === "mes"
+                  ? "bg-card shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Este Mês
+            </button>
+            <button
+              onClick={() => changeFilter("ano")}
+              className={`flex-1 text-xs font-medium py-1.5 px-1 rounded-lg transition-colors ${
+                filterPeriod === "ano"
+                  ? "bg-card shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Ano Todo
+            </button>
+            <button
+              onClick={() => changeFilter("escolher_mes")}
+              className={`flex-1 text-xs font-medium py-1.5 px-1 rounded-lg transition-colors flex items-center justify-center gap-1 ${
+                filterPeriod === "escolher_mes"
+                  ? "bg-card shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <CalendarDays className="h-3 w-3 shrink-0" />
+              <span className="truncate">
+                {filterPeriod === "escolher_mes"
+                  ? MONTH_NAMES[Number(filterMonth.split("-")[1])] +
+                    " " +
+                    filterMonth.split("-")[0]
+                  : "Mês"}
+              </span>
+            </button>
+          </div>
+
+          {filterPeriod === "escolher_mes" && (
+            <div className="overflow-x-auto pb-1 -mx-1 px-1">
+              {availableMonths.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-2">
+                  Nenhum dado disponível
+                </p>
+              ) : (
+                <div className="flex gap-2 w-max">
+                  {availableMonths.map((key) => {
+                    const [y, m] = key.split("-").map(Number);
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => changeMonth(key)}
+                        className={`text-sm py-2 px-4 rounded-full whitespace-nowrap transition-all font-medium ${
+                          filterMonth === key
+                            ? "bg-primary text-primary-foreground font-bold shadow-md"
+                            : "bg-muted text-foreground/70 hover:text-foreground"
+                        }`}
+                      >
+                        {MONTH_NAMES[m]} {y}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Contador */}
         <p className="text-[11px] text-muted-foreground">
-          {periodFilter.periodLabel} · {filteredJobs.length} registro(s)
+          {periodLabel} · {filteredJobs.length} registro(s)
         </p>
 
         {/* Empty state */}
