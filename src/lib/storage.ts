@@ -23,13 +23,15 @@ export async function logAudit(action: string, entityType?: string, entityId?: s
 
 // ---- Quotes ----
 
-export async function getQuotes(): Promise<Quote[]> {
+export async function getQuotes(from?: Date, to?: Date): Promise<Quote[]> {
   const uid = await getUserId();                          // [SEC] filtro explícito
-  const { data: rows, error } = await supabase
+  let q: any = supabase
     .from('quotes')
     .select('*')
-    .eq('user_id', uid)
-    .order('created_at', { ascending: false });
+    .eq('user_id', uid);
+  if (from) q = q.gte('created_at', from.toISOString());
+  if (to) q = q.lte('created_at', to.toISOString());
+  const { data: rows, error } = await q.order('created_at', { ascending: false });
   if (error || !rows) return [];
 
   const quoteIds = rows.map(r => r.id);
@@ -221,13 +223,15 @@ export async function deleteQuoteCost(quoteId: string, costId: string) {
 
 // ---- Jobs ----
 
-export async function getJobs(): Promise<Job[]> {
+export async function getJobs(from?: Date, to?: Date): Promise<Job[]> {
   const uid = await getUserId();                          // [SEC] filtro explícito
-  const { data: rows } = await supabase
+  let q: any = supabase
     .from('jobs')
     .select('*')
-    .eq('user_id', uid)
-    .order('created_at', { ascending: false });
+    .eq('user_id', uid);
+  if (from) q = q.gte('created_at', from.toISOString());
+  if (to) q = q.lte('created_at', to.toISOString());
+  const { data: rows } = await q.order('created_at', { ascending: false });
   if (!rows) return [];
 
   const jobIds = rows.map(r => r.id);

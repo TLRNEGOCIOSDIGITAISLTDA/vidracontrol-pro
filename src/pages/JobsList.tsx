@@ -1,10 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Briefcase, LayoutGrid, List, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { useData } from "@/lib/DataContext";
-import { JobStatus, JOB_STATUS_LABELS, JOB_STATUS_COLORS } from "@/lib/types";
+import { getJobs } from "@/lib/storage";
+import { Job, JobStatus, JOB_STATUS_LABELS, JOB_STATUS_COLORS } from "@/lib/types";
 import { motion } from "framer-motion";
 import { JobStepDots } from "@/components/app/JobStepDots";
 
@@ -28,6 +29,7 @@ type FilterPeriod = "mes" | "ano" | "escolher_mes";
 // ─── Componente ──────────────────────────────────────────────
 
 const JobsList = () => {
+  // DataContext: apenas para availableMonths (todos os meses com dados)
   const { jobs } = useData();
 
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -77,12 +79,12 @@ const JobsList = () => {
   const periodEnd = useMemo(() => {
     const now = new Date();
     if (filterPeriod === "mes")
-      return new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      return new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
     if (filterPeriod === "escolher_mes") {
       const [y, m] = filterMonth.split("-").map(Number);
-      return new Date(y, m + 1, 0, 23, 59, 59);
+      return new Date(y, m + 1, 0, 23, 59, 59, 999);
     }
-    return new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+    return new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
   }, [filterPeriod, filterMonth]);
 
   // Label do período atual
@@ -93,7 +95,7 @@ const JobsList = () => {
     return MONTH_NAMES[m] + " " + y;
   }, [filterPeriod, filterMonth]);
 
-  // Meses disponíveis (ordem cronológica)
+  // Meses disponíveis — usa todos os dados do DataContext
   const availableMonths = useMemo(() => {
     const keys = new Set<string>();
     jobs.forEach((j) => {
@@ -103,15 +105,12 @@ const JobsList = () => {
     return Array.from(keys).sort();
   }, [jobs]);
 
-  // Obras filtradas pelo período
-  const filteredJobs = useMemo(
-    () =>
-      jobs.filter((j) => {
-        const d = new Date(j.createdAt);
-        return d >= periodStart && d <= periodEnd;
-      }),
-    [jobs, periodStart, periodEnd],
-  );
+  // Obras do período — buscadas diretamente do Supabase com gte/lte
+  const [pageJobs, setPageJobs] = useState<Job[]>([]);
+
+  useEffect(() => {
+    getJobs(periodStart, periodEnd).then(setPageJobs);
+  }, [periodStart, periodEnd]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -218,11 +217,11 @@ const JobsList = () => {
 
         {/* Contador */}
         <p className="text-[11px] text-muted-foreground">
-          {periodLabel} · {filteredJobs.length} registro(s)
+          {periodLabel} · {pageJobs.length} registro(s)
         </p>
 
         {/* Empty state */}
-        {filteredJobs.length === 0 && (
+        {pageJobs.length === 0 && (
           <div className="text-center py-16">
             <Briefcase className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
             <p className="text-muted-foreground">Nenhuma obra no período.</p>
@@ -230,11 +229,11 @@ const JobsList = () => {
         )}
 
         {/* ── KANBAN VIEW ── */}
-        {filteredJobs.length > 0 && view === "kanban" && (
+        {pageJobs.length > 0 && view === "kanban" && (
           <div className="overflow-x-auto pb-4 -mx-4 px-4">
             <div className="flex gap-3" style={{ minWidth: "max-content" }}>
               {ALL_JOB_STATUSES.map(status => {
-                const colJobs = filteredJobs
+                const colJobs = pageJobs
                   .filter(j => ((j.status as JobStatus) || 'em_andamento') === status)
                   .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
                 const colTotal = colJobs.reduce((s, j) => s + j.saleValue, 0);
@@ -292,10 +291,10 @@ const JobsList = () => {
         )}
 
         {/* ── LIST VIEW ── */}
-        {filteredJobs.length > 0 && view === "list" && (
+        {pageJobs.length > 0 && view === "list" && (
           <div className="space-y-5">
             {ALL_JOB_STATUSES.map(status => {
-              const groupJobs = filteredJobs
+              const groupJobs = pageJobs
                 .filter(j => ((j.status as JobStatus) || 'em_andamento') === status)
                 .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
               if (groupJobs.length === 0) return null;

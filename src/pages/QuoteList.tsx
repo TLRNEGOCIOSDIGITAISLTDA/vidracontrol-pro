@@ -4,7 +4,8 @@ import { Plus, FileText, LayoutGrid, List, CheckCircle2, XCircle, Eye, CalendarD
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/app/AppHeader";
 import { useData } from "@/lib/DataContext";
-import { QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS, QUOTE_STATUS_BG } from "@/lib/types";
+import { getQuotes } from "@/lib/storage";
+import { Quote, QuoteStatus, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS, QUOTE_STATUS_BG } from "@/lib/types";
 import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { toast } from "sonner";
@@ -29,11 +30,8 @@ type FilterPeriod = "mes" | "ano" | "escolher_mes";
 // ─── Componente ──────────────────────────────────────────────
 
 const QuoteList = () => {
-  const { quotes, changeQuoteStatus, refreshQuotes } = useData();
-
-  useEffect(() => {
-    refreshQuotes();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // DataContext: quotes (todos) para availableMonths; lastUpdate para refetch pós-mutação
+  const { quotes, changeQuoteStatus, lastUpdate } = useData();
 
   const [searchParams] = useSearchParams();
   const novoId = searchParams.get("novo");
@@ -86,12 +84,12 @@ const QuoteList = () => {
   const periodEnd = useMemo(() => {
     const now = new Date();
     if (filterPeriod === "mes")
-      return new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      return new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
     if (filterPeriod === "escolher_mes") {
       const [y, m] = filterMonth.split("-").map(Number);
-      return new Date(y, m + 1, 0, 23, 59, 59);
+      return new Date(y, m + 1, 0, 23, 59, 59, 999);
     }
-    return new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+    return new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
   }, [filterPeriod, filterMonth]);
 
   // Label do período atual
@@ -112,19 +110,15 @@ const QuoteList = () => {
     return Array.from(keys).sort();
   }, [quotes]);
 
-  // Orçamentos filtrados pelo período
-  const filteredQuotes = useMemo(
-    () =>
-      quotes.filter((q) => {
-        const d = new Date(q.createdAt);
-        return d >= periodStart && d <= periodEnd;
-      }),
-    [quotes, periodStart, periodEnd],
-  );
+  // Orçamentos do período — buscados do Supabase com gte/lte
+  const [pageQuotes, setPageQuotes] = useState<Quote[]>([]);
+  useEffect(() => {
+    getQuotes(periodStart, periodEnd).then(setPageQuotes);
+  }, [periodStart, periodEnd, lastUpdate]);
 
   // Dados por status (para lista e gráficos)
   const quotesByStatus = ALL_STATUSES.map((status) => {
-    const filtered = filteredQuotes.filter(
+    const filtered = pageQuotes.filter(
       (q) => (q.status || "orcado") === status,
     );
     return {
@@ -269,11 +263,11 @@ const QuoteList = () => {
 
         {/* Contador */}
         <p className="text-[11px] text-muted-foreground">
-          {periodLabel} · {filteredQuotes.length} registro(s)
+          {periodLabel} · {pageQuotes.length} registro(s)
         </p>
 
         {/* Gráficos — só na view lista */}
-        {filteredQuotes.length > 0 && view === "list" && (
+        {pageQuotes.length > 0 && view === "list" && (
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-card rounded-xl p-4 shadow-card">
               <h3 className="text-xs font-bold text-muted-foreground text-center mb-2 uppercase tracking-wide">
@@ -357,7 +351,7 @@ const QuoteList = () => {
         )}
 
         {/* Empty state */}
-        {filteredQuotes.length === 0 && (
+        {pageQuotes.length === 0 && (
           <div className="text-center py-16">
             <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
             <p className="text-muted-foreground">Nenhum orçamento no período.</p>
@@ -365,12 +359,12 @@ const QuoteList = () => {
         )}
 
         {/* Kanban */}
-        {filteredQuotes.length > 0 && view === "kanban" && (
-          <QuoteKanban quotes={filteredQuotes} novoId={novoId} />
+        {pageQuotes.length > 0 && view === "kanban" && (
+          <QuoteKanban quotes={pageQuotes} novoId={novoId} />
         )}
 
         {/* Lista */}
-        {filteredQuotes.length > 0 && view === "list" && (
+        {pageQuotes.length > 0 && view === "list" && (
           <div className="space-y-5">
             {quotesByStatus
               .filter((g) => g.count > 0)
