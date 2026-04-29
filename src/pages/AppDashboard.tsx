@@ -137,13 +137,11 @@ if (period === 'escolher_mes') {
     [jobs] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  // ── KPIs filtrados por período ───────────────────────────────
-  const totalSales = filteredJobs.reduce((s, j) => s + j.saleValue, 0);
-  const totalCosts = filteredJobs.reduce((s, j) => s + j.expenses.reduce((es, e) => es + e.value, 0), 0);
-  // Lucro: apenas obras finalizadas no período (saleValue - custos)
-  const totalProfit = filteredJobs
-    .filter(j => j.status === 'finalizado')
-    .reduce((s, j) => s + (j.saleValue - j.expenses.reduce((es, e) => es + e.value, 0)), 0);
+  // ── KPIs filtrados por período — apenas obras finalizadas ────
+  const finishedJobs = filteredJobs.filter(j => j.status === 'finalizado');
+  const totalSales = finishedJobs.reduce((s, j) => s + j.saleValue, 0);
+  const totalCosts = finishedJobs.reduce((s, j) => s + j.expenses.reduce((es, e) => es + e.value, 0), 0);
+  const totalProfit = totalSales - totalCosts;
   const avgMargin = totalSales > 0 ? ((totalProfit / totalSales) * 100) : 0;
   const conversionRate = filteredQuotes.length > 0
     ? (filteredQuotes.filter(q => (q.status || 'orcado') === 'aprovado').length / filteredQuotes.length) * 100
@@ -176,14 +174,12 @@ if (period === 'escolher_mes') {
     })();
   }, [lastUpdate]);
 
-  // Total Recebido / A Receber — filtrados pelo período via timestamp exato
-  const periodReceived = useMemo(() =>
-    paymentsRaw
-      .filter(p => p.createdAt >= periodStart && p.createdAt <= periodEnd)
-      .reduce((s, p) => s + p.amount, 0),
-    [paymentsRaw, periodStart, periodEnd]
-  );
-  const periodPending = Math.max(0, totalSales - periodReceived);
+  // Recebido: soma do totalReceived das obras finalizadas no período
+  const periodReceived = finishedJobs.reduce((s, j) => s + (j.totalReceived ?? 0), 0);
+  // A Receber: TODAS as obras abertas, sem filtro de período
+  const periodPending = jobs
+    .filter(j => OPEN_JOB_STATUSES.includes(j.status as JobStatus))
+    .reduce((s, j) => s + Math.max(0, j.saleValue - (j.totalReceived ?? 0)), 0);
 
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
