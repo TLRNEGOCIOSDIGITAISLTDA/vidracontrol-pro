@@ -140,7 +140,10 @@ if (period === 'escolher_mes') {
   // ── KPIs filtrados por período ───────────────────────────────
   const totalSales = filteredJobs.reduce((s, j) => s + j.saleValue, 0);
   const totalCosts = filteredJobs.reduce((s, j) => s + j.expenses.reduce((es, e) => es + e.value, 0), 0);
-  const totalProfit = totalSales - totalCosts;
+  // Lucro: apenas obras finalizadas no período (saleValue - custos)
+  const totalProfit = filteredJobs
+    .filter(j => j.status === 'finalizado')
+    .reduce((s, j) => s + (j.saleValue - j.expenses.reduce((es, e) => es + e.value, 0)), 0);
   const avgMargin = totalSales > 0 ? ((totalProfit / totalSales) * 100) : 0;
   const conversionRate = filteredQuotes.length > 0
     ? (filteredQuotes.filter(q => (q.status || 'orcado') === 'aprovado').length / filteredQuotes.length) * 100
